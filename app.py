@@ -362,19 +362,28 @@ def get_solution_graph(assignment_id):
             True,    # step 5
             True,    # step 6
         ],
-        'submissions': []
+        'submissions': [
+            {
+                'submission_uid': 'student1_1',
+                'submission_nodes': [0, 1, 2, 3, 4, 6]
+            },
+            {
+                'submission_uid': 'student2_2',
+                'submission_nodes': [0, 1, 5, 6]
+            }
+        ]
     }
     
     # Add student submissions
-    for solution in solutions:
-        student = User.query.get(solution.student_id)
-        if student:
-            # Mock submission data - in real implementation, analyze the solution
-            submission_nodes = [0, 1, 2, 3, 4, 5, 6]  # 0-indexed integer steps
-            graph_data['submissions'].append({
-                'submission_uid': f"{student.username}_{solution.id}",
-                'submission_nodes': submission_nodes
-            })
+    # for solution in solutions:
+    #     student = User.query.get(solution.student_id)
+    #     if student:
+    #         # Mock submission data - in real implementation, analyze the solution
+    #         submission_nodes = [0, 1, 2, 3, 4, 5, 6]  # 0-indexed integer steps
+    #         graph_data['submissions'].append({
+    #             'submission_uid': f"{student.username}_{solution.id}",
+    #             'submission_nodes': submission_nodes
+    #         })
     
     return jsonify(graph_data)
 

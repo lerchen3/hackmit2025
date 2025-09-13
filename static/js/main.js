@@ -328,7 +328,14 @@ function initializeGraph(containerId, graphData) {
         })
         .attr('stroke', d => (d.type === 'start' || d.type === 'end') ? '#000000' : '#fff')
         .attr('stroke-width', 2)
-        .style('cursor', 'pointer');
+        .style('cursor', 'pointer')
+        .on('click', function(event, d) {
+            // Only handle click if we're not dragging
+            if (d.isDragging) return;
+            
+            // Handle node click to select students using this step
+            selectStudentsUsingStep(d.id);
+        });
 
     // Add invisible larger circle for easier hovering on process nodes
     node.filter(d => d.type === 'process')
@@ -341,6 +348,14 @@ function initializeGraph(containerId, graphData) {
         .attr('opacity', 0)
         .style('cursor', 'pointer')
         .style('pointer-events', 'all')
+        .on('click', function(event, d) {
+            // Only handle click if we're not dragging
+            if (d.isDragging) return;
+            
+            // Handle node click to select students using this step
+            event.stopPropagation();
+            selectStudentsUsingStep(d.id);
+        })
         .on('mouseover', function(event, d) {
             // Clear any existing timeout
             if (this.tooltipTimeout) {
@@ -480,6 +495,9 @@ function initializeGraph(containerId, graphData) {
         
         d.fx = d.x;
         d.fy = d.y;
+        
+        // Mark that we're dragging to prevent click events
+        d.isDragging = false;
     }
 
     function dragged(event, d) {
@@ -487,6 +505,9 @@ function initializeGraph(containerId, graphData) {
         if (d.fx !== undefined && d.fy !== undefined) {
             return; // Prevent dragging of start/end nodes
         }
+        
+        // Mark that we're dragging
+        d.isDragging = true;
         
         // Process nodes can move more freely but within reasonable bounds
         d.fx = Math.max(50, Math.min(750, event.x));
@@ -504,12 +525,29 @@ function initializeGraph(containerId, graphData) {
         // Allow process nodes to settle naturally
         d.fx = null;
         d.fy = null;
+        
+        // Reset dragging flag after a short delay to allow click events
+        setTimeout(() => {
+            d.isDragging = false;
+        }, 100);
     }
 
     // Highlight student paths
     function highlightStudentPath(submissionUid) {
         // Reset all nodes and links first
-        node.select('circle').attr('stroke', '#fff').attr('stroke-width', 2);
+        node.select('circle').attr('stroke', d => {
+            // Start and end nodes should have black outline, process nodes white
+            return d.type === 'start' || d.type === 'end' ? '#000000' : '#fff';
+        }).attr('stroke-width', 2)
+        .attr('fill', d => {
+            // Restore original fill colors
+            if (d.type === 'start') return '#ffffff';
+            if (d.type === 'end') return '#ffffff';
+            if (d.type === 'process') {
+                return d.is_correct ? '#333333' : '#666666';
+            }
+            return '#999999';
+        });
         link.attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
         
         // Hide all tooltips and clear highlighting class
@@ -536,8 +574,14 @@ function initializeGraph(containerId, graphData) {
         // Highlight path nodes
         const highlightedNodes = node.filter(d => path.includes(d.id));
         highlightedNodes.select('circle')
-            .attr('stroke', '#ffc107')
-            .attr('stroke-width', 4);
+            .attr('stroke', d => {
+                // Use yellow outline for all highlighted nodes
+                return '#ffc107';
+            })
+            .attr('stroke-width', d => {
+                // Make stroke thicker for all highlighted nodes to show they're highlighted
+                return 4;
+            });
         
         // Show tooltips for highlighted process nodes
         highlightedNodes.filter(d => d.type === 'process')
@@ -575,6 +619,27 @@ function initializeGraph(containerId, graphData) {
         .attr('stroke-width', 4)
         .attr('marker-end', 'url(#arrowhead)');
     }
+
+    // Function to select students using a specific step
+    function selectStudentsUsingStep(stepId) {
+        // Find all students that use this step
+        const studentsUsingStep = graphData.submissions.filter(submission => 
+            submission.submission_nodes.includes(stepId)
+        ).map(submission => submission.submission_uid);
+        
+        // Update all checkboxes
+        const checkboxes = document.querySelectorAll('#student-list input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            const isUsingStep = studentsUsingStep.includes(checkbox.value);
+            checkbox.checked = isUsingStep;
+        });
+        
+        // Update highlighting based on new selection
+        updateHighlighting();
+    }
+    
+    // Make selectStudentsUsingStep available globally
+    window.selectStudentsUsingStep = selectStudentsUsingStep;
 
     // Return highlight function for external use
     return highlightStudentPath;
