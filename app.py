@@ -333,29 +333,48 @@ def get_solution_graph(assignment_id):
     # In a real implementation, you would analyze the solutions and generate a graph
     solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
     
-    # Mock graph data for demonstration
+    # Generate graph data in the new format with 0-indexed integer nodes
     graph_data = {
-        'nodes': [
-            {'id': 'start', 'label': 'Start', 'type': 'start'},
-            {'id': 'step1', 'label': 'Step 1', 'type': 'process'},
-            {'id': 'step2', 'label': 'Step 2', 'type': 'process'},
-            {'id': 'step3', 'label': 'Step 3', 'type': 'process'},
-            {'id': 'end', 'label': 'End', 'type': 'end'}
+        'graph': [
+            {'from': 0, 'to': 1},
+            {'from': 1, 'to': 2},
+            {'from': 2, 'to': 3},
+            {'from': 3, 'to': 4},
+            {'from': 1, 'to': 5},
+            {'from': 5, 'to': 6},
+            {'from': 4, 'to': 6}
         ],
-        'edges': [
-            {'from': 'start', 'to': 'step1'},
-            {'from': 'step1', 'to': 'step2'},
-            {'from': 'step2', 'to': 'step3'},
-            {'from': 'step3', 'to': 'end'}
+        'step_summary': [
+            'Start',      # step 0
+            'Apply first method',      # step 1
+            'Apply second method',     # step 2
+            'Apply third method',     # step 2
+            'Apply fourth method',     # step 2
+            'Finalize solution',       # step 3
+            'End'                 # step 4
         ],
-        'student_paths': {}
+        'step_is_correct': [
+            True,   # step 0
+            True,   # step 1
+            True,   # step 2
+            True,   # step 3
+            True,    # step 4
+            True,    # step 5
+            True,    # step 6
+        ],
+        'submissions': []
     }
     
-    # Add student paths (mock data)
-    # for i, solution in enumerate(solutions):
-    #     student = User.query.get(solution.student_id)
-    graph_data['student_paths']["student1"] = ['start', 'step1', 'step2', 'step3', 'end']
-    graph_data['student_paths']["student2"] = ['start', 'end']
+    # Add student submissions
+    for solution in solutions:
+        student = User.query.get(solution.student_id)
+        if student:
+            # Mock submission data - in real implementation, analyze the solution
+            submission_nodes = [0, 1, 2, 3, 4, 5, 6]  # 0-indexed integer steps
+            graph_data['submissions'].append({
+                'submission_uid': f"{student.username}_{solution.id}",
+                'submission_nodes': submission_nodes
+            })
     
     return jsonify(graph_data)
 
