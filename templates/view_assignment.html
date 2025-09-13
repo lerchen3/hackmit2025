@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}{{ assignment.title }} - Assignment System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-file-alt text-primary mr-3"></i>{{ assignment.title }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">View assignment details and submit your solution</p>
+        </div>
+        <a href="{{ url_for('student_dashboard') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Assignment Details -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-info-circle text-primary mr-2"></i>Assignment Details
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <span class="text-sm font-medium text-gray-500">Created:</span>
+                            <p class="text-sm text-gray-900">{{ assignment.created_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                        </div>
+                        <div>
+                            <span class="text-sm font-medium text-gray-500">Status:</span>
+                            <div class="mt-1">
+                                {% if solution %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-check mr-1"></i>Submitted
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <i class="fas fa-clock mr-1"></i>Not Submitted
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if assignment.description_text %}
+                    <div class="mb-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-2">Description:</h4>
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ assignment.description_text }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if assignment.description_image %}
+                    <div class="mb-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-2">Description Image:</h4>
+                        <img src="{{ url_for('uploaded_assignment_file', filename=assignment.description_image) }}" 
+                             class="w-full rounded-lg" alt="Assignment description">
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Solution Submission Form -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-upload text-primary mr-2"></i>Submit Your Solution
+                    </h3>
+                    
+                    {% if solution %}
+                    <div class="mb-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-blue-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    You have already submitted a solution. You can update it by submitting a new one.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="POST" action="{{ url_for('submit_solution', assignment_id=assignment.id) }}" enctype="multipart/form-data" class="space-y-6">
+                        <div>
+                            <label for="solution_text" class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-align-left mr-1"></i>Text Solution
+                            </label>
+                            <textarea id="solution_text" name="solution_text" rows="8" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                      placeholder="Enter your solution here...">{{ solution.solution_text if solution else '' }}</textarea>
+                            <p class="mt-2 text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Provide a detailed text solution to the assignment.
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label for="solution_file" class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-file-pdf mr-1"></i>File Solution (PDF)
+                            </label>
+                            <input type="file" id="solution_file" name="solution_file" 
+                                   accept=".pdf"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary">
+                            <p class="mt-2 text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Upload a PDF file with your solution. Maximum file size: 16MB
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <label for="final_answer" class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-flag-checkered mr-1"></i>Final Answer
+                            </label>
+                            <textarea id="final_answer" name="final_answer" rows="4" 
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                                      placeholder="Enter your final answer here...">{{ solution.final_answer if solution else '' }}</textarea>
+                            <p class="mt-2 text-sm text-gray-500">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Provide a concise final answer or conclusion to your solution.
+                            </p>
+                        </div>
+                        
+                        {% if solution and solution.solution_file %}
+                        <div>
+                            <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">Current file: {{ solution.solution_file }}</p>
+                                    </div>
+                                    <a href="{{ url_for('uploaded_solution_file', filename=solution.solution_file) }}" 
+                                       class="inline-flex items-center px-3 py-1 border border-primary text-sm font-medium rounded-md text-primary bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" 
+                                       target="_blank">
+                                        <i class="fas fa-download mr-1"></i>Download
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="flex justify-between">
+                            <a href="{{ url_for('student_dashboard') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                            </a>
+                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                <i class="fas fa-save mr-2"></i>
+                                {% if solution %}Update Solution{% else %}Submit Solution{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Current Solution -->
+            {% if solution %}
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-check-circle text-success mr-2"></i>Your Current Solution
+                    </h3>
+                    
+                    <p class="text-sm text-gray-500 mb-4">
+                        Submitted: {{ solution.submitted_at.strftime('%B %d, %Y at %I:%M %p') }}
+                    </p>
+                    
+                    {% if solution.solution_text %}
+                    <div class="mb-4">
+                        <h4 class="text-sm font-medium text-gray-900 mb-2">Text Solution:</h4>
+                        <div class="bg-gray-50 border border-gray-200 rounded-md p-3">
+                            <p class="text-xs text-gray-700">{{ solution.solution_text[:100] }}{% if solution.solution_text|length > 100 %}...{% endif %}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if solution.solution_file %}
+                    <div class="mb-4">
+                        <h4 class="text-sm font-medium text-gray-900 mb-2">File Solution:</h4>
+                        <div class="flex items-center">
+                            <i class="fas fa-file-pdf text-red-500 text-2xl mr-3"></i>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">{{ solution.solution_file }}</p>
+                                <p class="text-xs text-gray-500">PDF Document</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Teacher Feedback -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-comment text-primary mr-2"></i>Teacher Feedback
+                    </h3>
+                    
+                    {% if feedback %}
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-medium text-gray-900">Feedback:</h4>
+                            <span class="text-xs text-gray-500">{{ feedback.created_at.strftime('%B %d, %Y') }}</span>
+                        </div>
+                        <p class="text-sm text-gray-700">{{ feedback.feedback_text }}</p>
+                    </div>
+                    {% else %}
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-info-circle text-blue-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    No feedback available yet. Your teacher will review your solution and provide feedback.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Submission Tips -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-lightbulb text-primary mr-2"></i>Submission Tips
+                    </h3>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-success mr-2"></i>
+                            Read the assignment description carefully
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-success mr-2"></i>
+                            Provide clear and detailed solutions
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-success mr-2"></i>
+                            Use both text and file formats if helpful
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-check text-success mr-2"></i>
+                            Check your work before submitting
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

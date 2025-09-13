@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Assignment System{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full space-y-8">
+        <div>
+            <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-primary">
+                <i class="fas fa-graduation-cap text-white text-xl"></i>
+            </div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+                Sign in to your account
+            </h2>
+            <p class="mt-2 text-center text-sm text-gray-600">
+                Or
+                <a href="{{ url_for('register') }}" class="font-medium text-primary hover:text-blue-500">
+                    create a new account
+                </a>
+            </p>
+        </div>
+        <form class="mt-8 space-y-6" method="POST" action="{{ url_for('login') }}">
+            <div class="rounded-md shadow-sm -space-y-px">
+                <div>
+                    <label for="username" class="sr-only">Username</label>
+                    <input id="username" name="username" type="text" required class="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 text-base" placeholder="Username">
+                </div>
+                <div>
+                    <label for="password" class="sr-only">Password</label>
+                    <input id="password" name="password" type="password" class="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-primary focus:border-primary focus:z-10 text-base" placeholder="Password (optional for students)">
+                </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            <strong>Students:</strong> Can leave password empty<br>
+                            <strong>Teachers:</strong> Must provide a password
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <button type="submit" class="group relative w-full flex justify-center py-3 px-6 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <i class="fas fa-sign-in-alt text-blue-500 group-hover:text-blue-400"></i>
+                    </span>
+                    Sign in
+                </button>
+            </div>
+        </form>
+        
+        <div class="mt-8 bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                <i class="fas fa-info-circle text-primary mr-2"></i>How to get started
+            </h3>
+            <div class="space-y-3">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-graduation-cap text-primary"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-gray-700">
+                            <strong>Students:</strong> Register with just your name
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-chalkboard-teacher text-success"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-gray-700">
+                            <strong>Teachers:</strong> Register with name and password
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-tasks text-info"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-gray-700">
+                            <strong>Features:</strong> Create assignments, submit solutions, view feedback
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

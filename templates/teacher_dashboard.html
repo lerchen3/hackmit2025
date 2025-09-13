@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Teacher Dashboard - Assignment System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-4xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-chalkboard-teacher text-primary mr-3"></i>Teacher Dashboard
+            </h1>
+            <p class="mt-1 text-base text-gray-500">Manage assignments and review student solutions</p>
+        </div>
+        <a href="{{ url_for('create_assignment') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+            <i class="fas fa-plus mr-2"></i>Create Assignment
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Assignments List -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-list text-primary mr-2"></i>Your Assignments
+                    </h3>
+                    
+                    {% if assignments %}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for assignment in assignments %}
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-medium text-gray-900 mb-2">
+                                            <i class="fas fa-file-alt text-primary mr-2"></i>{{ assignment.title }}
+                                        </h4>
+                                        <p class="text-sm text-gray-500 mb-3">
+                                            Created: {{ assignment.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                                        </p>
+                                        <div class="flex items-center justify-between">
+                                            <a href="{{ url_for('view_solutions', assignment_id=assignment.id) }}" 
+                                               class="inline-flex items-center px-3 py-1 border border-primary text-sm font-medium rounded-md text-primary bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                                <i class="fas fa-eye mr-1"></i>View Solutions
+                                            </a>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                {{ assignment.solutions|length if assignment.solutions else 0 }} solutions
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-12">
+                            <i class="fas fa-file-alt text-gray-400 text-6xl mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No assignments yet</h3>
+                            <p class="text-gray-500 mb-6">Create your first assignment to get started!</p>
+                            <a href="{{ url_for('create_assignment') }}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                <i class="fas fa-plus mr-2"></i>Create Assignment
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Quick Stats -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-primary mr-2"></i>Quick Stats
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-primary">{{ assignments|length }}</div>
+                            <div class="text-sm text-gray-500">Assignments</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-success">{{ total_solutions }}</div>
+                            <div class="text-sm text-gray-500">Total Solutions</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-info-circle text-primary mr-2"></i>Quick Actions
+                    </h3>
+                    <div class="space-y-3">
+                        <a href="{{ url_for('create_assignment') }}" class="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                            <i class="fas fa-plus mr-2"></i>Create New Assignment
+                        </a>
+                        <button onclick="showHelp()" class="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                            <i class="fas fa-question-circle mr-2"></i>Help & Guide
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div id="helpModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">
+                    <i class="fas fa-question-circle text-primary mr-2"></i>Teacher Guide
+                </h3>
+                <button onclick="closeHelp()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <h4 class="text-md font-medium text-gray-900 mb-2">Getting Started:</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-sm text-gray-700">
+                        <li>Create assignments with titles and descriptions (text or images)</li>
+                        <li>Students will see and submit solutions to your assignments</li>
+                        <li>View all student solutions for each assignment</li>
+                        <li>Provide feedback to students on their work</li>
+                        <li>Use the graph visualization to analyze solution patterns</li>
+                    </ol>
+                </div>
+                
+                <div>
+                    <h4 class="text-md font-medium text-gray-900 mb-2">Features:</h4>
+                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-700">
+                        <li><strong>Assignment Management:</strong> Create, view, and manage assignments</li>
+                        <li><strong>Solution Review:</strong> View student submissions in detail</li>
+                        <li><strong>Feedback System:</strong> Provide personalized feedback to students</li>
+                        <li><strong>Graph Analysis:</strong> Visualize solution patterns and student progress</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showHelp() {
+    document.getElementById('helpModal').classList.remove('hidden');
+}
+
+function closeHelp() {
+    document.getElementById('helpModal').classList.add('hidden');
+}
+
+// Close modal when clicking outside
+document.getElementById('helpModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeHelp();
+    }
+});
+</script>
+{% endblock %}

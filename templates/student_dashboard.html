@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Student Dashboard - Assignment System{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-4xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-graduation-cap text-primary mr-3"></i>Welcome, {{ current_user.username }}!
+            </h1>
+            <p class="mt-1 text-base text-gray-500">View assignments and track your progress</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Assignments List -->
+        <div class="lg:col-span-2">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-list text-primary mr-2"></i>Available Assignments
+                    </h3>
+                    
+                    {% if assignments %}
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {% for assignment in assignments %}
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="text-lg font-medium text-gray-900 mb-2">
+                                            <i class="fas fa-file-alt text-primary mr-2"></i>{{ assignment.title }}
+                                        </h4>
+                                        <p class="text-sm text-gray-500 mb-3">
+                                            Created: {{ assignment.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                                        </p>
+                                        
+                                        {% set solution = solutions|selectattr('assignment_id', 'equalto', assignment.id)|first %}
+                                        <div class="flex items-center justify-between mb-3">
+                                            {% if solution %}
+                                                {% set has_text = solution.solution_text %}
+                                                {% set has_file = solution.solution_file %}
+                                                {% set has_final = solution.final_answer %}
+                                                
+                                                {% if has_text and has_file and has_final %}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                        <i class="fas fa-check-circle mr-1"></i>Complete
+                                                    </span>
+                                                {% elif has_text or has_file or has_final %}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        <i class="fas fa-check mr-1"></i>Submitted
+                                                    </span>
+                                                {% else %}
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                        <i class="fas fa-exclamation-triangle mr-1"></i>Incomplete
+                                                    </span>
+                                                {% endif %}
+                                                <span class="text-xs text-gray-500">
+                                                    {{ solution.submitted_at.strftime('%m/%d/%Y') }}
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                                    <i class="fas fa-clock mr-1"></i>Not Submitted
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <a href="{{ url_for('view_assignment', assignment_id=assignment.id) }}" 
+                                           class="inline-flex items-center px-3 py-1 border border-primary text-sm font-medium rounded-md text-primary bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                            <i class="fas fa-eye mr-1"></i>View Assignment
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-12">
+                            <i class="fas fa-inbox text-gray-400 text-6xl mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No assignments available</h3>
+                            <p class="text-gray-500">Your teacher hasn't created any assignments yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Recent Feedback -->
+            {% if feedbacks %}
+            <div class="bg-white shadow rounded-lg mt-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-comment text-primary mr-2"></i>Recent Feedback
+                    </h3>
+                    <div class="space-y-4">
+                        {% for feedback in feedbacks[:3] %}
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="text-sm font-medium text-gray-900">{{ feedback.assignment.title }}</h4>
+                                <span class="text-xs text-gray-500">{{ feedback.created_at.strftime('%B %d, %Y') }}</span>
+                            </div>
+                            <p class="text-sm text-gray-700">{{ feedback.feedback_text[:100] }}{% if feedback.feedback_text|length > 100 %}...{% endif %}</p>
+                        </div>
+                        {% endfor %}
+                        
+                        {% if feedbacks|length > 3 %}
+                        <div class="text-center">
+                            <span class="text-sm text-gray-500">And {{ feedbacks|length - 3 }} more feedback items...</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Progress Stats -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar text-primary mr-2"></i>Your Progress
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-primary">{{ assignments|length }}</div>
+                            <div class="text-sm text-gray-500">Total Assignments</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-bold text-success">{{ solutions|length }}</div>
+                            <div class="text-sm text-gray-500">Submitted</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between text-sm text-gray-600 mb-1">
+                            <span>Submission Rate:</span>
+                            <span>{{ "%.1f"|format((solutions|length / assignments|length * 100) if assignments|length > 0 else 0) }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-primary h-2 rounded-full" 
+                                 style="width: {{ (solutions|length / assignments|length * 100) if assignments|length > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Guide -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-info-circle text-primary mr-2"></i>Quick Guide
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex items-start">
+                            <i class="fas fa-eye text-primary mt-1 mr-3"></i>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">View Assignments</p>
+                                <p class="text-xs text-gray-500">Click on any assignment to see details</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-upload text-success mt-1 mr-3"></i>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Submit Solutions</p>
+                                <p class="text-xs text-gray-500">Upload files or write text responses</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-comment text-warning mt-1 mr-3"></i>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Check Feedback</p>
+                                <p class="text-xs text-gray-500">View teacher feedback on your submissions</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-question text-info mt-1 mr-3"></i>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Need Help</p>
+                                <p class="text-xs text-gray-500">Contact your teacher for assistance</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

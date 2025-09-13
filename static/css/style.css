@@ -1,0 +1,693 @@
+/* Custom CSS for Assignment System with Tailwind CSS */
+
+/* Global font size for better readability */
+html {
+    font-size: 18px; /* Increased base font size to 18px */
+}
+
+body {
+    line-height: 1.6; /* Improved line height for readability */
+    background-color: #ffffff; /* White background */
+    color: #1f2937; /* Dark grey text */
+}
+
+/* Ensure all text elements inherit the larger base size */
+p, span, div, a, button, input, textarea, select, label {
+    font-size: inherit;
+}
+
+/* Specific font size improvements for better readability */
+h1, h2, h3, h4, h5, h6 {
+    line-height: 1.3;
+}
+
+/* Improve button and form element sizes */
+button, .btn {
+    font-size: 1.125rem; /* Increased from 1rem */
+    padding: 0.875rem 1.75rem; /* Slightly increased padding */
+}
+
+input, textarea, select {
+    font-size: 1.125rem; /* Increased from 1rem */
+    padding: 0.875rem 1.25rem; /* Slightly increased padding */
+}
+
+/* Improve table readability */
+table {
+    font-size: 1.125rem; /* Increased from 1rem */
+}
+
+th, td {
+    padding: 0.875rem 1.25rem; /* Slightly increased padding */
+    font-size: 1.125rem; /* Increased from 1rem */
+}
+
+/* Improve card content readability */
+.card-content {
+    font-size: 1.125rem; /* Increased from 1rem */
+    line-height: 1.7; /* Slightly increased line height */
+}
+
+/* Improve navigation readability */
+nav a {
+    font-size: 1.125rem; /* Increased from 1rem */
+    padding: 0.875rem 1.25rem; /* Slightly increased padding */
+}
+
+/* Improve badge and status indicator readability */
+.badge, .status-indicator {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* Custom animations and transitions */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Custom utility classes for enhanced Tailwind */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom hover effects */
+.hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Custom gradient backgrounds - Custom Color Palette */
+.gradient-primary {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, #374151 0%, #6b7280 100%);
+}
+
+.gradient-warning {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+}
+
+/* Custom theme gradients */
+.gradient-card {
+    background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+}
+
+.gradient-accent {
+    background: linear-gradient(135deg, #6b7280 0%, #ffffff 100%);
+}
+
+/* Custom scrollbar styling */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Enhanced form styling - Custom Color Palette */
+.form-input-enhanced {
+    transition: all 0.2s ease-in-out;
+    border: 2px solid #d1d5db;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.form-input-enhanced:focus {
+    border-color: #374151;
+    box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.2);
+    transform: translateY(-1px);
+    background-color: #f9fafb;
+}
+
+.form-input-enhanced::placeholder {
+    color: #6b7280;
+}
+
+/* Custom badge styles */
+.badge-enhanced {
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+}
+
+/* Custom card enhancements - Custom Color Palette */
+.card-enhanced {
+    transition: all 0.3s ease-in-out;
+    border: 1px solid #e5e7eb;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.card-enhanced:hover {
+    border-color: #374151;
+    box-shadow: 0 20px 25px -5px rgba(31, 41, 55, 0.2), 0 10px 10px -5px rgba(31, 41, 55, 0.1);
+    background-color: #f9fafb;
+}
+
+/* Custom button enhancements */
+.btn-enhanced {
+    transition: all 0.2s ease-in-out;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+.btn-enhanced:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-enhanced:active {
+    transform: translateY(0);
+}
+
+/* Custom loading spinner */
+.spinner-custom {
+    border: 3px solid #f3f4f6;
+    border-top: 3px solid #3B82F6;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Custom modal enhancements */
+.modal-enhanced {
+    backdrop-filter: blur(4px);
+    background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Custom table enhancements - Custom Color Palette */
+.table-enhanced {
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.table-enhanced th {
+    background: linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%);
+    border-bottom: 2px solid #374151;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.75rem;
+    color: #1f2937;
+}
+
+.table-enhanced tr:hover {
+    background-color: #f9fafb;
+}
+
+.table-enhanced td {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+/* Custom progress bar */
+.progress-enhanced {
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-enhanced .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3B82F6 0%, #1D4ED8 100%);
+    border-radius: 4px;
+    transition: width 0.6s ease-in-out;
+}
+
+/* Custom feedback card */
+.feedback-card-enhanced {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 1rem;
+    position: relative;
+}
+
+.feedback-card-enhanced::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%);
+    border-radius: 8px 8px 0 0;
+}
+
+/* Custom assignment card - Custom Color Palette */
+.assignment-card-enhanced {
+    transition: all 0.3s ease-in-out;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.assignment-card-enhanced:hover {
+    border-color: #374151;
+    transform: translateY(-2px);
+    box-shadow: 0 20px 25px -5px rgba(31, 41, 55, 0.2), 0 10px 10px -5px rgba(31, 41, 55, 0.1);
+    background-color: #f9fafb;
+}
+
+/* Custom solution status indicators */
+.status-submitted {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.status-pending {
+    background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Custom graph container */
+.graph-container {
+    min-height: 400px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Custom file upload area */
+.file-upload-area {
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.file-upload-area:hover {
+    border-color: #3B82F6;
+    background-color: #f8fafc;
+}
+
+.file-upload-area.dragover {
+    border-color: #3B82F6;
+    background-color: #eff6ff;
+}
+
+/* Custom textarea enhancements */
+.textarea-enhanced {
+    resize: vertical;
+    min-height: 120px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Custom image styling */
+.image-enhanced {
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s ease-in-out;
+}
+
+.image-enhanced:hover {
+    transform: scale(1.02);
+}
+
+/* Custom notification styles */
+.notification-success {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.notification-error {
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Custom responsive utilities */
+@media (max-width: 640px) {
+    .mobile-stack {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .mobile-full {
+        width: 100%;
+    }
+}
+
+/* Custom focus styles for accessibility */
+.focus-enhanced:focus {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+/* Custom selection styles */
+::selection {
+    background-color: #3B82F6;
+    color: white;
+}
+
+::-moz-selection {
+    background-color: #3B82F6;
+    color: white;
+}
+
+/* Custom Color Palette Theme Overrides */
+/* General theme styles */
+.bg-white {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+}
+
+.bg-gray-50 {
+    background-color: #f9fafb !important;
+}
+
+.bg-gray-100 {
+    background-color: #f3f4f6 !important;
+}
+
+.text-gray-900 {
+    color: #111827 !important;
+}
+
+.text-gray-700 {
+    color: #374151 !important;
+}
+
+.text-gray-600 {
+    color: #4b5563 !important;
+}
+
+.text-gray-500 {
+    color: #6b7280 !important;
+}
+
+.border-gray-300 {
+    border-color: #d1d5db !important;
+}
+
+.border-gray-200 {
+    border-color: #e5e7eb !important;
+}
+
+/* Form inputs custom theme */
+input, textarea, select {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    border-color: #d1d5db !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    background-color: #f9fafb !important;
+    border-color: #374151 !important;
+    box-shadow: 0 0 0 3px rgba(55, 65, 81, 0.2) !important;
+}
+
+input::placeholder, textarea::placeholder {
+    color: #6b7280 !important;
+}
+
+/* Button custom theme */
+.bg-primary {
+    background-color: #1f2937 !important;
+}
+
+.hover\:bg-blue-700:hover {
+    background-color: #374151 !important;
+}
+
+/* Card and container custom theme */
+.shadow {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+.shadow-lg {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Info boxes and alerts */
+.bg-blue-50 {
+    background-color: #f9fafb !important;
+    border-color: #d1d5db !important;
+}
+
+.text-blue-700 {
+    color: #1f2937 !important;
+}
+
+.border-blue-200 {
+    border-color: #d1d5db !important;
+}
+
+/* Icons and accents */
+.text-primary {
+    color: #1f2937 !important;
+}
+
+.text-success {
+    color: #374151 !important;
+}
+
+.text-info {
+    color: #6b7280 !important;
+}
+
+/* Navigation and links */
+a {
+    color: #1f2937 !important;
+}
+
+a:hover {
+    color: #374151 !important;
+}
+
+/* Navbar specific styling */
+nav.bg-primary {
+    background-color: #1f2937 !important;
+}
+
+/* Navbar brand/logo styling */
+nav .text-white {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+nav .text-white:hover {
+    color: #f3f4f6 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Navbar icons styling */
+nav i {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) !important;
+}
+
+nav .hover\:text-blue-200:hover i {
+    color: #dbeafe !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4)) !important;
+}
+
+/* Login/Register button styling */
+nav .bg-white {
+    background-color: #ffffff !important;
+    color: #1f2937 !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+nav .bg-white:hover {
+    background-color: #f9fafb !important;
+    color: #374151 !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+nav .bg-white i {
+    color: #1f2937 !important;
+    text-shadow: none !important;
+    filter: none !important;
+}
+
+nav .bg-white:hover i {
+    color: #374151 !important;
+}
+
+/* Button enhancements for better visibility */
+.btn, button, .btn-primary {
+    background-color: #1f2937 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.btn:hover, button:hover, .btn-primary:hover {
+    background-color: #374151 !important;
+    color: #f3f4f6 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+.btn:active, button:active, .btn-primary:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Button icons styling */
+.btn i, button i, .btn-primary i {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3)) !important;
+}
+
+.btn:hover i, button:hover i, .btn-primary:hover i {
+    color: #f3f4f6 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4)) !important;
+}
+
+/* Success/Submit buttons */
+.btn-success, .btn-submit {
+    background-color: #059669 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-success:hover, .btn-submit:hover {
+    background-color: #047857 !important;
+    color: #f0fdf4 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Warning/Danger buttons */
+.btn-warning, .btn-danger {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-warning:hover, .btn-danger:hover {
+    background-color: #b91c1c !important;
+    color: #fef2f2 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Create Assignment Button - Enhanced visibility */
+a[href*="create_assignment"], .create-assignment-btn, button[type="submit"] {
+    color: #ffffff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.025em !important;
+}
+
+a[href*="create_assignment"]:hover, .create-assignment-btn:hover, button[type="submit"]:hover {
+    color: #f8fafc !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6) !important;
+}
+
+a[href*="create_assignment"] i, .create-assignment-btn i, button[type="submit"] i {
+    color: #ffffff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)) !important;
+}
+
+a[href*="create_assignment"]:hover i, .create-assignment-btn:hover i, button[type="submit"]:hover i {
+    color: #f8fafc !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6) !important;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
+}
+
+/* Additional specificity for create assignment buttons */
+.bg-primary.text-white, .bg-primary.text-white:hover {
+    color: #ffffff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+}
+
+.bg-primary.text-white i, .bg-primary.text-white:hover i {
+    color: #ffffff !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5)) !important;
+}
