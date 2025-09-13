@@ -13,9 +13,11 @@
             <p class="mt-1 text-sm text-gray-500">Review and provide feedback on student submissions</p>
         </div>
         <div class="flex space-x-3">
+            {% if current_user.is_teacher %}
             <button onclick="showGraph()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-info hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-info">
                 <i class="fas fa-project-diagram mr-2"></i>View Graph
             </button>
+            {% endif %}
             <a href="{{ url_for('teacher_dashboard') }}" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
             </a>
@@ -185,7 +187,7 @@
                             <input class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" 
                                    type="checkbox" 
                                    value="{{ solution.student.username }}" 
-                                   onchange="highlightStudent(this.value, this.checked)">
+                                   onchange="updateHighlighting()">
                             <span class="ml-3 text-sm font-medium text-gray-900">{{ solution.student.username }}</span>
                         </label>
                         {% endfor %}
@@ -212,7 +214,13 @@ let highlightFunction = null;
 
 function showGraph() {
     document.getElementById('graphModal').classList.remove('hidden');
+    // Only load graph data if user is a teacher
+    {% if current_user.is_teacher %}
     loadGraphData();
+    {% else %}
+    document.getElementById('graph-container').innerHTML = 
+        '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">Access denied. Only teachers can view solution graphs.</p></div></div></div>';
+    {% endif %}
 }
 
 function closeGraph() {
@@ -221,18 +229,33 @@ function closeGraph() {
 
 function loadGraphData() {
     fetch(`/api/solution-graph/{{ assignment.id }}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error('Access denied. Only teachers can view solution graphs.');
+                } else if (response.status === 404) {
+                    throw new Error('Graph data not found.');
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            }
+            return response.json();
+        })
         .then(data => {
             const container = document.getElementById('graph-container');
             container.innerHTML = '';
+            
+            // Store graph data globally for multi-student highlighting
+            window.graphData = data;
             
             // Initialize the graph
             highlightFunction = initializeGraph('graph-container', data);
         })
         .catch(error => {
             console.error('Error loading graph:', error);
-            document.getElementById('graph-container').innerHTML = 
-                '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">Error loading graph data.</p></div></div></div>';
+            const container = document.getElementById('graph-container');
+            container.innerHTML = 
+                '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">' + error.message + '</p></div></div></div>';
         });
 }
 
@@ -245,6 +268,64 @@ function highlightStudent(studentName, checked) {
             highlightFunction(null);
         }
     }
+}
+
+// Function to handle multiple student selections
+function updateHighlighting() {
+    if (!highlightFunction) return;
+    
+    const checkedStudents = Array.from(document.querySelectorAll('#student-list input[type="checkbox"]:checked'))
+        .map(checkbox => checkbox.value);
+    
+    if (checkedStudents.length === 0) {
+        // No students selected, reset highlighting
+        highlightFunction(null);
+    } else if (checkedStudents.length === 1) {
+        // One student selected, highlight their path
+        highlightFunction(checkedStudents[0]);
+    } else {
+        // Multiple students selected, highlight all their paths
+        highlightMultipleStudents(checkedStudents);
+    }
+}
+
+function highlightMultipleStudents(studentNames) {
+    // Reset all nodes and links first
+    const svg = d3.select('#graph-container svg');
+    if (svg.empty()) return;
+    
+    svg.selectAll('.node circle').attr('stroke', '#fff').attr('stroke-width', 2);
+    svg.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+    
+    // Get all unique nodes and links from all selected students
+    const allPaths = studentNames.map(name => window.graphData?.student_paths?.[name] || []).filter(path => path.length > 0);
+    const allNodes = [...new Set(allPaths.flat())];
+    const allLinks = [];
+    
+    allPaths.forEach(path => {
+        for (let i = 0; i < path.length - 1; i++) {
+            allLinks.push({ source: path[i], target: path[i + 1] });
+        }
+    });
+    
+    // Highlight all nodes
+    svg.selectAll('.node')
+        .filter(d => allNodes.includes(d.id))
+        .select('circle')
+        .attr('stroke', '#ffc107')
+        .attr('stroke-width', 4);
+    
+    // Highlight all links
+    svg.selectAll('line')
+        .filter(d => {
+            return allLinks.some(link => 
+                (link.source === d.source && link.target === d.target) ||
+                (link.source === d.target && link.target === d.source)
+            );
+        })
+        .attr('stroke', '#ffc107')
+        .attr('stroke-opacity', 1)
+        .attr('stroke-width', 4);
 }
 
 // Close modal when clicking outside

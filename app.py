@@ -352,9 +352,10 @@ def get_solution_graph(assignment_id):
     }
     
     # Add student paths (mock data)
-    for i, solution in enumerate(solutions):
-        student = User.query.get(solution.student_id)
-        graph_data['student_paths'][student.username] = ['start', 'step1', 'step2', 'step3', 'end']
+    # for i, solution in enumerate(solutions):
+    #     student = User.query.get(solution.student_id)
+    graph_data['student_paths']["student1"] = ['start', 'step1', 'step2', 'step3', 'end']
+    graph_data['student_paths']["student2"] = ['start', 'end']
     
     return jsonify(graph_data)
 

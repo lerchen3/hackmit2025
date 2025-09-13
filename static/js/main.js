@@ -74,6 +74,21 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeGraph(containerId, graphData) {
     const container = document.getElementById(containerId);
     if (!container) return;
+    
+    // Validate graph data
+    if (!graphData || !graphData.nodes || !Array.isArray(graphData.nodes) || !graphData.edges || !Array.isArray(graphData.edges)) {
+        console.error('Invalid graph data:', graphData);
+        container.innerHTML = '<div class="text-center text-red-600">Invalid graph data provided</div>';
+        return;
+    }
+    
+    // Check if nodes have required properties
+    const invalidNodes = graphData.nodes.filter(node => !node || !node.id);
+    if (invalidNodes.length > 0) {
+        console.error('Invalid nodes found:', invalidNodes);
+        container.innerHTML = '<div class="text-center text-red-600">Invalid node data provided</div>';
+        return;
+    }
 
     // Create SVG
     const svg = d3.select(container)
@@ -82,16 +97,22 @@ function initializeGraph(containerId, graphData) {
         .attr('height', 500)
         .attr('viewBox', '0 0 800 500');
 
+    // Convert edges to proper format for D3
+    const edges = graphData.edges.map(edge => ({
+        source: edge.from,
+        target: edge.to
+    }));
+
     // Create simulation
     const simulation = d3.forceSimulation(graphData.nodes)
-        .force('link', d3.forceLink(graphData.edges).id(d => d.id).distance(100))
+        .force('link', d3.forceLink(edges).id(d => d.id).distance(100))
         .force('charge', d3.forceManyBody().strength(-300))
         .force('center', d3.forceCenter(400, 250));
 
     // Create links
     const link = svg.append('g')
         .selectAll('line')
-        .data(graphData.edges)
+        .data(edges)
         .enter().append('line')
         .attr('stroke', '#999')
         .attr('stroke-opacity', 0.6)
@@ -163,29 +184,32 @@ function initializeGraph(containerId, graphData) {
 
     // Highlight student paths
     function highlightStudentPath(studentName) {
-        if (graphData.student_paths[studentName]) {
-            const path = graphData.student_paths[studentName];
-            
-            // Reset all nodes and links
-            node.select('circle').attr('stroke', '#fff').attr('stroke-width', 2);
-            link.attr('stroke', '#999').attr('stroke-opacity', 0.6);
-            
-            // Highlight path nodes
-            node.filter(d => path.includes(d.id))
-                .select('circle')
-                .attr('stroke', '#ffc107')
-                .attr('stroke-width', 4);
-            
-            // Highlight path links
-            link.filter(d => {
-                const sourceIndex = path.indexOf(d.source.id);
-                const targetIndex = path.indexOf(d.target.id);
-                return sourceIndex !== -1 && targetIndex !== -1 && targetIndex === sourceIndex + 1;
-            })
-            .attr('stroke', '#ffc107')
-            .attr('stroke-opacity', 1)
-            .attr('stroke-width', 4);
+        // Reset all nodes and links first
+        node.select('circle').attr('stroke', '#fff').attr('stroke-width', 2);
+        link.attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2);
+        
+        // If no student name provided or student not found, just reset and return
+        if (!studentName || !graphData.student_paths[studentName]) {
+            return;
         }
+        
+        const path = graphData.student_paths[studentName];
+        
+        // Highlight path nodes
+        node.filter(d => path.includes(d.id))
+            .select('circle')
+            .attr('stroke', '#ffc107')
+            .attr('stroke-width', 4);
+        
+        // Highlight path links
+        link.filter(d => {
+            const sourceIndex = path.indexOf(d.source);
+            const targetIndex = path.indexOf(d.target);
+            return sourceIndex !== -1 && targetIndex !== -1 && targetIndex === sourceIndex + 1;
+        })
+        .attr('stroke', '#ffc107')
+        .attr('stroke-opacity', 1)
+        .attr('stroke-width', 4);
     }
 
     // Return highlight function for external use
