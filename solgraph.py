@@ -3,8 +3,8 @@ from openai import OpenAI
 from apimanager import APIManager
 
 class SolutionGraph:
-    EMBED_DIM = 128
-    api_manager=APIManager("test_api_key")
+    EMBED_DIM = 3072
+    api_manager=APIManager()
     def __init__(self,problem_text):
         self.index = IndexFlatL2(EMBED_DIM)
         self.problem_text = problem_text
@@ -19,7 +19,7 @@ class SolutionGraph:
         if response is None:
             print("Failed to receive step breakdown from API.")
             return False
-        
+
         
 
 

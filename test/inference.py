@@ -18,7 +18,6 @@ api_key = os.getenv("VLLM_API_KEY", "test-123")
 
 client = OpenAI(base_url=base_url, api_key=api_key)
 
-
 messages = [{"role": "user", "content": "What's 1+1?"}]
 
 
