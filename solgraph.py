@@ -12,6 +12,7 @@ class SolutionGraph:
         self.problem_text = problem_text
         self.stepSummary=[]
         self.solutions=[]
+        self.solution_is_correct=[]
         self.solution_uid_to_index={}
         self.subject_domain=subject_domain
     def formatStepSummaryQuery(self,step):
@@ -30,6 +31,9 @@ class SolutionGraph:
             if distance[i] < SolutionGraph.DISTANCE_THRESHOLD:
                 # Manually verify that they are same with LLM query
                 response=SolutionGraph.api_manager.query(self.formatVerificationQuery(step,self.stepSummary[indices[i]]))
+                if response is None:
+                    print("Failed to receive verification from API.")
+                    continue
                 if response.choices[0].message.content.strip()[0]=="Y":
                     return indices[i]
                     
@@ -41,31 +45,34 @@ class SolutionGraph:
         self.stepSummary.append(summary.choices[0].message.content.strip())
         return self.index.ntotal-1
 
-    def addSolution(self, solution_uid,solution_text):
-        response = SolutionGraph.api_manager.query([{"role": "system", "content": "You are a helpful assistant that can break down solutions into smaller steps and return them in a list."}, 
-                            {"role": "user", "content": f"I was unable to solve the following problem:\n" 
-                                                        f"{problem_text}\n"
-                                                        f"I came across a potentially incomplete solution to the problem online, but I am unable to understand it."
-                                                        f"Could you break down the solution into individual steps in a way that highlights key ideas and formulas instead of simplification and computation? Adding concise comments and titles for each step would be helpful. The solution is as follows:\n"
-                                                        f"{solution_text}"}])
+    def addSolution(self, solution_uid,solution_text,is_correct):
+        response = self.api_manager.query([{"role": "system", "content": f"You are a helpful assistant who can break down solutions to mathematics problems into smaller steps."}, 
+                                    {"role": "user", "content": f"One of my students was trying to solve the following problem:\n" 
+                                                                f"{self.problem_text}\n"
+                                                                f"Their solution may have errors or be incomplete. "
+                                                                f"Could you organize the solution into individual major steps in a way that highlights key ideas and formulas? Each step should begin with ###, followed by the step number and a short description, and include no other formatting. The solution is as follows:\n"
+                                                                f"{solution_text}"}])
+
         if response is None:
             print("Failed to receive step breakdown from API.")
             return False
         
-        steps = response.split("###").pop(0)
+        steps = response.choices[0].message.content.split("###")[1:]
         stepIndices=[]
         for step in steps:
             step = step.strip()
             if step:
-                ind = getIndex(step)
+                ind = self.getIndex(step)
                 if ind is None:
-                    print(f"Failed to embed step: {step}. Will skip adding this solution.")
+                    print(f"Failed to embed step: {step}. Solution will not be added.")
+                    return False
                 else:
                     stepIndices.append(ind)
 
         self.solutions.append(stepIndices)
         self.solution_uid_to_index[solution_uid]=len(self.solutions)-1
-        return False
+        self.solution_is_correct.append(is_correct)
+        return True
     
     '''
     Generates a graph of the solution
@@ -73,6 +80,7 @@ class SolutionGraph:
     {
         "graph" : list of edges,
         "step_summary" : list of step summaries,
+        "step_is_correct" : list of boolean values,
         "submissions" : [
             {
                 "submission_uid:" : string,
@@ -83,11 +91,104 @@ class SolutionGraph:
 
     '''
     def generateGraph(self):
-        graph = []
-        step_summary = []
+        graph = [[] for i in range(0,len(self.stepSummary))]
+        inDegree = [0 for i in range(0,len(self.stepSummary))]
         submissions = []
         n = len(self.stepSummary)
+        
+        # Build the graph from solutions
         for i in range(0,len(self.solutions)):
-            for j in self.solutions[i]:
+            for j in range(0,len(self.solutions[i])-1):
+                graph[self.solutions[i][j]].append(self.solutions[i][j+1])
+                inDegree[self.solutions[i][j+1]] += 1
+        
+        # Extract strongly connected components using Kosaraju's algorithm
+        sccs = self.kosaraju_scc(graph, n)
+        scc_indices = [0 for i in range(0,n)]
+        for scc_id in range(0,len(sccs)):
+            for node in sccs[scc_id]:
+                scc_indices[node] = scc_id
+
+        # Build the step summary graph
+        step_graph=[]
+        for solution in self.solutions:
+            for j in range(0,len(solution)):
+                for k in range(j-1,-1,-1):
+                    if scc_indices[solution[j]] != scc_indices[solution[k]]:
+                        step_graph.append((solution[k],solution[j]))
+                        break
+                for k in range(j+1,len(solution)):
+                    if scc_indices[solution[j]] != scc_indices[solution[k]]:
+                        step_graph.append((solution[j],solution[k]))
+                        break
+
+        # Perform error marking
+        step_is_correct = [False for i in range(0,n)]
+        for i in range(0,len(self.solutions)):
+            if self.solution_is_correct[i] is True:
+                for j in self.solutions[i]:
+                    step_is_correct[j]=True
+
+        # Prepare submissions data
+        for i in range(len(self.solutions)):
+            submissions.append({
+                "submission_uid": list(self.solution_uid_to_index.keys())[i],
+                "submission_nodes": self.solutions[i]
+            })
+        
+        return {
+            "graph": graph, 
+            "step_summary": self.stepSummary, 
+            "step_is_correct": step_is_correct,
+            "submissions": submissions
+        }
+    
+    def kosaraju_scc(self, graph, n):
+        """
+        Kosaraju's algorithm to find strongly connected components
+        Returns a list of SCCs, where each SCC is a list of node indices
+        """
+        # Step 1: Create transpose graph
+        transpose_graph = [[] for _ in range(n)]
+        for u in range(n):
+            for v in graph[u]:
+                transpose_graph[v].append(u)
+        
+        # Step 2: First DFS to get finish times (topological order)
+        visited = [False] * n
+        stack = []
+        
+        def dfs1(node):
+            visited[node] = True
+            for neighbor in graph[node]:
+                if not visited[neighbor]:
+                    dfs1(neighbor)
+            stack.append(node)
+        
+        # Perform DFS on all unvisited nodes
+        for i in range(n):
+            if not visited[i]:
+                dfs1(i)
+        
+        # Step 3: Second DFS on transpose graph in reverse order
+        visited = [False] * n
+        sccs = []
+        
+        def dfs2(node, scc):
+            visited[node] = True
+            scc.append(node)
+            for neighbor in transpose_graph[node]:
+                if not visited[neighbor]:
+                    dfs2(neighbor, scc)
+        
+        # Process nodes in reverse order of finish times
+        while stack:
+            node = stack.pop()
+            if not visited[node]:
+                scc = []
+                dfs2(node, scc)
+                sccs.append(scc)
+        
+        return sccs
                 
                 
