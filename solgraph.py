@@ -3,23 +3,26 @@ from openai import OpenAI
 from apimanager import APIManager
 
 class SolutionGraph:
-    EMBED_DIM = 128
+    EMBED_DIM = 3072
     SEARCH_COUNT = 3
-    DISTANCE_THRESHOLD = 1536
+    DISTANCE_THRESHOLD = 3072
     api_manager=APIManager("test_api_key")
     def __init__(self,problem_text,subject_domain="math"):
         self.index = IndexFlatL2(EMBED_DIM)
         self.problem_text = problem_text
-        self.stepSummary=[]
+        self.index.add([100] * SolutionGraph.EMBED_DIM)
+        self.index.add([-100] * SolutionGraph.EMBED_DIM)
+        self.stepSummary=["Read the problem statement", "Full Solution."]
         self.solutions=[]
         self.solution_is_correct=[]
         self.solution_uid_to_index={}
         self.subject_domain=subject_domain
+        self.step_root=[]
     def formatStepSummaryQuery(self,step):
         return [{"role":"system","content":f"You are a helpful assistant who concisely and without unnecessary details summarizes the key ideas of the following step of a solution to a {self.subject_domain} problem."},{"role":"user","content":f"The step is as follows:\n{step}"}]
 
     def formatVerificationQuery(self,step1,step2):
-        return [{"role":"system","content":f"You are a helpful assistant who checks whether the key ideas of certain texts are the exact same."},{"role":"user","content":f"Both texts are steps of a solution to a {self.subject_domain} problem. The first text is as follows:\n{step1} The second text is as follows:\n{step2} Please answer with a Yes or No."}]
+        return [{"role":"system","content":f"You are a helpful assistant who checks whether the key ideas of certain texts are the exact same. Respond with a Yes or No."},{"role":"user","content":f"Both texts are steps of a solution to a {self.subject_domain} problem. The first text is as follows:\n{step1} The second text is as follows:\n{step2} Are they functionally the same?"}]
 
     def getIndex(self, step):
         embed = self.api_manager.embedText(step)
@@ -27,6 +30,8 @@ class SolutionGraph:
             return None
         embed_vector=embed.data[0]
         distance, indices = self.index.search(embed_vector,SolutionGraph.SEARCH_COUNT)
+        self.index.add(embed_vector)
+        self.step_root.append(self.index.ntotal-1)
         for i in range(0,SolutionGraph.SEARCH_COUNT):
             if distance[i] < SolutionGraph.DISTANCE_THRESHOLD:
                 # Manually verify that they are same with LLM query
@@ -35,13 +40,14 @@ class SolutionGraph:
                     print("Failed to receive verification from API.")
                     continue
                 if response.choices[0].message.content.strip()[0]=="Y":
-                    return indices[i]
+                    ret = self.step_root[indices[i]]
+                    self.step_root[-1] = ret
+                    return ret
                     
         # No match found, generate new index + a summary of the step
         summary=self.api_manager.query(self.formatStepSummaryQuery(step));
         if summary is None:
             return None
-        self.index.add(embed_vector)
         self.stepSummary.append(summary.choices[0].message.content.strip())
         return self.index.ntotal-1
 
@@ -113,14 +119,21 @@ class SolutionGraph:
         step_graph=[]
         for solution in self.solutions:
             for j in range(0,len(solution)):
+                found_prev = False, found_next= True
                 for k in range(j-1,-1,-1):
                     if scc_indices[solution[j]] != scc_indices[solution[k]]:
                         step_graph.append((solution[k],solution[j]))
+                        found_prev = True
                         break
                 for k in range(j+1,len(solution)):
                     if scc_indices[solution[j]] != scc_indices[solution[k]]:
                         step_graph.append((solution[j],solution[k]))
+                        found_next = True
                         break
+                if not found_prev:
+                    step_graph.append((0,solution[j]))
+                if not found_next:
+                    step_graph.append((solution[j],1))
 
         # Perform error marking
         step_is_correct = [False for i in range(0,n)]
