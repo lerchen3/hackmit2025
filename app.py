@@ -315,6 +315,42 @@ def submit_feedback(assignment_id, student_id):
     flash('Feedback submitted successfully!', 'success')
     return redirect(url_for('view_solution_detail', solution_id=request.form.get('solution_id')))
 
+@app.route('/teacher/feedback/bulk', methods=['POST'])
+@login_required
+def submit_bulk_feedback():
+    if not current_user.is_teacher:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    assignment_id = data.get('assignment_id')
+    student_ids = data.get('student_ids', [])
+    feedback_text = data.get('feedback_text', '')
+    
+    if not assignment_id or not student_ids or not feedback_text:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        for student_id in student_ids:
+            # Update existing feedback or create new one
+            feedback = Feedback.query.filter_by(assignment_id=assignment_id, student_id=student_id).first()
+            if feedback:
+                feedback.feedback_text = feedback_text
+                feedback.teacher_id = current_user.id
+            else:
+                feedback = Feedback(
+                    assignment_id=assignment_id,
+                    student_id=student_id,
+                    teacher_id=current_user.id,
+                    feedback_text=feedback_text
+                )
+                db.session.add(feedback)
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Feedback submitted to {len(student_ids)} student(s)'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to submit feedback'}), 500
+
 @app.route('/uploads/assignments/<filename>')
 def uploaded_assignment_file(filename):
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], 'assignments', filename))
