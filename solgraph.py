@@ -49,7 +49,7 @@ class SolutionGraph:
     EMBED_DIM = 3072  # Dimension of the embedding vectors (matches API embedding model)
     SEARCH_COUNT = 3  # Number of similar steps to retrieve during similarity search
     DISTANCE_THRESHOLD = 3072  # Maximum distance threshold for considering steps as similar
-    api_manager = APIManager("bnxe")  # Shared API manager instance for all operations
+    api_manager = APIManager("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")  # Shared API manager instance for all operations
 
     def __init__(self, problem_text, subject_domain="math"):
         """
@@ -590,7 +590,7 @@ class SolutionTree:
             if step_text is not None:
                 self.parent_summary = step_text  # Store the solution text
 
-    api_manager = APIManager("bnxe")  # Shared API manager for LLM queries
+    api_manager = APIManager("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")  # Shared API manager for LLM queries
 
     def __init__(self, problem_text, subject_domain="math"):
         """

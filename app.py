@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, Response, stream_with_context
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -13,6 +13,7 @@ import csv
 import time
 from graph_manager import graph_manager
 from apimanager import APIManager
+from event_bus import agent_event_bus
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,7 +36,7 @@ login_manager.login_view = 'login'
 
 # Initialize API manager for LLM operations
 try:
-    api_manager = APIManager("bnxe")
+    api_manager = APIManager("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")
 except Exception as e:
     print(f"Warning: Could not initialize API manager: {e}")
     api_manager = None
@@ -370,6 +371,51 @@ def view_solution_detail(solution_id):
     feedback = Feedback.query.filter_by(assignment_id=solution.assignment_id, student_id=solution.student_id).first()
     
     return render_template('solution_detail.html', solution=solution, assignment=assignment, student=student, feedback=feedback)
+
+@app.route('/teacher/agents', endpoint='agents_panel')
+@login_required
+def agents_panel():
+    if not current_user.is_teacher:
+        flash('Access denied', 'error')
+        return redirect(url_for('student_dashboard'))
+    return render_template('agents.html')
+
+@app.route('/events/agents', endpoint='events_agents')
+@login_required
+def events_agents():
+    if not current_user.is_teacher:
+        return jsonify({'error': 'Access denied'}), 403
+
+    def event_stream():
+        q = agent_event_bus.subscribe()
+        try:
+            # Initial comment to open stream
+            yield ': connected\n\n'
+            last_heartbeat = time.time()
+            while True:
+                try:
+                    evt = q.get(timeout=1.0)
+                    yield f"data: {json.dumps(evt)}\n\n"
+                except Exception:
+                    pass
+                # Heartbeat every 15s to keep connection alive
+                now = time.time()
+                if now - last_heartbeat > 15:
+                    yield ': heartbeat\n\n'
+                    last_heartbeat = now
+        finally:
+            try:
+                agent_event_bus.unsubscribe(q)
+            except Exception:
+                pass
+
+    headers = {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+        'Connection': 'keep-alive',
+    }
+    return Response(stream_with_context(event_stream()), headers=headers)
 
 @app.route('/teacher/feedback/<int:assignment_id>/<int:student_id>', methods=['POST'])
 @login_required

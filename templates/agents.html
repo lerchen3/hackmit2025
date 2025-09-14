@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Agents - Live LLM Activity{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-robot text-purple-600 mr-3"></i>Agents
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Live stream of LLM queries happening across your workspace</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{{ url_for('teacher_dashboard') }}" 
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+            </a>
+            <button id="clear-finished" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                <i class="fas fa-broom mr-2"></i>Clear Finished
+            </button>
+        </div>
+    </div>
+
+    <div id="agents-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const agents = new Map();
+
+function createAgentCard(evt) {
+    const card = document.createElement('div');
+    card.className = 'bg-white shadow rounded-lg p-4 border border-gray-200';
+    card.id = `agent-${evt.id}`;
+    card.innerHTML = `
+        <div class="flex items-start justify-between mb-2">
+            <div>
+                <div class="text-sm text-gray-500">${evt.provider || 'provider'} • ${evt.model || 'model'}</div>
+                <div class="text-xs text-gray-400" data-ts="${evt.ts}">${new Date(evt.ts * 1000).toLocaleTimeString()}</div>
+            </div>
+            <span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Running</span>
+        </div>
+        <div class="text-xs text-gray-600 mb-2">${escapeHtml(evt.preview || '')}</div>
+        <pre class="stream text-sm bg-gray-50 border border-gray-200 rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap"></pre>
+    `;
+    return card;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function onEvent(evt) {
+    const container = document.getElementById('agents-container');
+    let ag = agents.get(evt.id);
+    if (!ag) {
+        ag = { meta: evt, chunks: '' };
+        agents.set(evt.id, ag);
+        const card = createAgentCard(evt);
+        ag.el = card;
+        ag.streamEl = card.querySelector('.stream');
+        ag.statusEl = card.querySelector('.status-badge');
+        container.prepend(card);
+    }
+    if (evt.status === 'chunk' && evt.content) {
+        ag.chunks += evt.content;
+        ag.streamEl.textContent = ag.chunks;
+        ag.statusEl.textContent = 'Streaming';
+        ag.statusEl.className = 'status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800';
+    } else if (evt.status === 'finished') {
+        ag.statusEl.textContent = 'Finished';
+        ag.statusEl.className = 'status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+    } else if (evt.status === 'error') {
+        ag.statusEl.textContent = 'Error';
+        ag.statusEl.className = 'status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+        if (evt.error) {
+            ag.chunks += `\n[error] ${evt.error}`;
+            ag.streamEl.textContent = ag.chunks;
+        }
+    } else if (evt.status === 'started') {
+        // already created
+    }
+}
+
+function connectSSE() {
+    const es = new EventSource('/events/agents');
+    es.onmessage = (e) => {
+        try {
+            const evt = JSON.parse(e.data);
+            if (evt && evt.kind === 'llm') {
+                onEvent(evt);
+            }
+        } catch (err) {
+            console.error('Bad event', err);
+        }
+    };
+    es.onerror = () => {
+        // auto-reconnect in 2s
+        es.close();
+        setTimeout(connectSSE, 2000);
+    };
+}
+
+document.getElementById('clear-finished').addEventListener('click', function() {
+    const container = document.getElementById('agents-container');
+    for (const [id, ag] of agents.entries()) {
+        const status = ag?.statusEl?.textContent || '';
+        if (status === 'Finished' || status === 'Error') {
+            if (ag.el && ag.el.parentNode === container) {
+                container.removeChild(ag.el);
+            }
+            agents.delete(id);
+        }
+    }
+});
+
+connectSSE();
+</script>
+{% endblock %}
+
+
