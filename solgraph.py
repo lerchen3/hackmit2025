@@ -232,7 +232,7 @@ Reasoning: ...
                 if not found_prev:
                     step_graph.append((0,int(solution[j])))  # Convert to Python int
                 if not found_next:
-                    step_graph.append((int(solution[j]),n-1))  # Convert to Python int
+                    step_graph.append((int(solution[j]),1))  # Convert to Python int
 
         # Perform error marking
         step_is_correct = [False for i in range(0,n)]
@@ -245,7 +245,7 @@ Reasoning: ...
         for uid, idx in self.solution_uid_to_index.items():
             submissions.append({
                 "submission_uid": uid,
-                "submission_nodes": [0] + [int(x) for x in self.solutions[idx]] + [n-1]  # Ensure all values are Python int
+                "submission_nodes": [0] + [int(x) for x in self.solutions[idx]] + [1]  # Ensure all values are Python int
             })
         
         return {
