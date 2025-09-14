@@ -186,7 +186,7 @@
                         <label class="flex items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
                             <input class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" 
                                    type="checkbox" 
-                                   value="{{ solution.student.username }}_{{ solution.id }}" 
+                                   value="{{ solution.student.username }}_{{ solution.id }}_{{ solution.student.id }}" 
                                    onchange="updateHighlighting()">
                             <span class="ml-3 text-sm font-medium text-gray-900">{{ solution.student.username }}</span>
                         </label>
@@ -327,7 +327,10 @@ function updateHighlighting() {
     if (!highlightFunction) return;
     
     const checkedSubmissions = Array.from(document.querySelectorAll('#student-list input[type="checkbox"]:checked'))
-        .map(checkbox => checkbox.value);
+        .map(checkbox => {
+            // Extract username_solutionId from checkbox value (first two parts)
+            return checkbox.value.split('_').slice(0, 2).join('_');
+        });
     
     if (checkedSubmissions.length === 0) {
         // No submissions selected, reset highlighting
@@ -441,7 +444,7 @@ function openFeedbackModal() {
     
     selectedCheckboxes.forEach(checkbox => {
         const studentName = checkbox.nextElementSibling.textContent;
-        const studentId = checkbox.value.split('_')[1]; // Extract student ID from value
+        const studentId = checkbox.value.split('_')[2]; // Extract student ID from value (username_solutionId_studentId)
         const studentElement = document.createElement('span');
         studentElement.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800';
         studentElement.textContent = studentName;
@@ -466,7 +469,7 @@ document.getElementById('feedback-form').addEventListener('submit', async functi
     
     const selectedCheckboxes = document.querySelectorAll('#student-list input[type="checkbox"]:checked');
     const studentIds = Array.from(selectedCheckboxes).map(checkbox => {
-        return parseInt(checkbox.value.split('_')[1]); // Extract student ID
+        return parseInt(checkbox.value.split('_')[2]); // Extract student ID (username_solutionId_studentId)
     });
     
     const feedbackText = document.getElementById('feedback-text').value.trim();

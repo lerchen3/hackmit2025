@@ -630,7 +630,9 @@ function initializeGraph(containerId, graphData) {
         // Update all checkboxes
         const checkboxes = document.querySelectorAll('#student-list input[type="checkbox"]');
         checkboxes.forEach(checkbox => {
-            const isUsingStep = studentsUsingStep.includes(checkbox.value);
+            // Extract username_solutionId from checkbox value (first two parts)
+            const checkboxUid = checkbox.value.split('_').slice(0, 2).join('_');
+            const isUsingStep = studentsUsingStep.includes(checkboxUid);
             checkbox.checked = isUsingStep;
         });
         
