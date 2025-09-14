@@ -426,17 +426,46 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             .on('drag', dragged)
             .on('end', dragended));
 
+    // Calculate node usage proportions
+    const nodeUsageCounts = {};
+    const totalSubmissions = graphData.submissions ? graphData.submissions.length : 0;
+    
+    // Count how many submissions use each node
+    if (graphData.submissions) {
+        graphData.submissions.forEach(submission => {
+            if (submission.submission_nodes) {
+                let me = submission.submission_nodes;
+                //remove duplicates of me
+                me = [...new Set(me)];
+                me.forEach(nodeId => {
+                    nodeUsageCounts[nodeId] = (nodeUsageCounts[nodeId] || 0) + 1;
+                });
+            }
+        });
+    }
+    
+    // Function to get solid color based on usage proportion
+    function getUsageColor(usageProportion) {
+        if (usageProportion === 0) return '#ffffff'; // White for 0% usage
+        if (usageProportion === 1) return '#000000'; // Black for 100% usage
+        
+        // Calculate grey intensity based on usage proportion
+        // Lighter grey (closer to white) for lower usage
+        // Darker grey (closer to black) for higher usage
+        const intensity = Math.floor(usageProportion * 128) + 127; // Range from 127 to 255
+        const greyValue = 255 - intensity; // Invert so higher usage = darker
+        return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
+    }
+    
     // Add circles to nodes
     node.append('circle')
         .attr('r', 20)
         .attr('fill', d => {
-            if (d.type === 'start' || d.type === 'end') return '#ffffff';
-            if (d.type === 'process') {
-                return d.is_correct ? '#333333' : '#666666';
-            }
-            return '#999999';
+            const usageCount = nodeUsageCounts[d.id] || 0;
+            const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
+            return getUsageColor(usageProportion);
         })
-        .attr('stroke', d => (d.type === 'start' || d.type === 'end') ? '#000000' : '#fff')
+        .attr('stroke', '#000000')
         .attr('stroke-width', 2)
         .style('cursor', 'pointer')
         .on('click', function(event, d) {
@@ -446,6 +475,19 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             // Handle node click to select students using this step
             selectStudentsUsingStep(d.id);
         });
+
+    // Add X mark for incorrect nodes
+    node.filter(d => d.type === 'process' && !d.is_correct)
+        .append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Arial, sans-serif')
+        .attr('font-size', '16px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#ff0000')
+        .text('✕');
 
     // Add invisible larger circle for easier hovering on process nodes
     node.filter(d => d.type === 'process')
@@ -637,6 +679,7 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         .attr('font-weight', 'bold')
         .attr('opacity', 0) // Hide all text labels by default
         .text(d => d.label);
+    
 
     // Create tooltip groups for all nodes (process, start, and end)
     const tooltipGroups = node
@@ -733,19 +776,19 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
     // Highlight student paths
     function highlightStudentPath(submissionUid) {
         // Reset all nodes and links first
-        node.select('circle').attr('stroke', d => {
-            // Start and end nodes should have black outline, process nodes white
-            return (d.type === 'start' || d.type === 'end') ? '#000000' : '#fff';
-        }).attr('stroke-width', 2)
+        node.select('circle').attr('stroke', '#000000').attr('stroke-width', 2)
         .attr('fill', d => {
-            // Restore original fill colors
-            if (d.type === 'start' || d.type === 'end') return '#ffffff';
-            if (d.type === 'process') {
-                return d.is_correct ? '#333333' : '#666666';
-            }
-            return '#999999';
+            // Restore usage-based fill colors for all node types
+            const usageCount = nodeUsageCounts[d.id] || 0;
+            const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
+            return getUsageColor(usageProportion);
         });
         link.attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
+        
+        // Preserve X marks for incorrect nodes during reset
+        node.filter(d => d.type === 'process' && !d.is_correct)
+            .select('text')
+            .attr('fill', '#ff0000');
         
         // Hide all tooltips
         node
@@ -773,14 +816,19 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         // Highlight path nodes
         const highlightedNodes = node.filter(d => path.includes(d.id));
         highlightedNodes.select('circle')
-            .attr('stroke', d => {
-                // Use yellow outline for all highlighted nodes
-                return '#ffc107';
-            })
-            .attr('stroke-width', d => {
-                // Make stroke thicker for all highlighted nodes to show they're highlighted
-                return 4;
+            .attr('stroke', '#ffc107')
+            .attr('stroke-width', 4)
+            .attr('fill', d => {
+                // Preserve the usage-based color for all node types
+                const usageCount = nodeUsageCounts[d.id] || 0;
+                const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
+                return getUsageColor(usageProportion);
             });
+        
+        // Preserve X marks for incorrect nodes during highlighting
+        highlightedNodes.filter(d => d.type === 'process' && !d.is_correct)
+            .select('text')
+            .attr('fill', '#ff0000');
         
         // Don't show tooltips when highlighting - only show on hover
         

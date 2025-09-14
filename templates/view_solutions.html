@@ -335,6 +335,23 @@ function loadGraphData() {
             // Store graph data globally for multi-student highlighting
             window.graphData = data;
             
+            // Calculate node usage counts for highlighting functions
+            window.nodeUsageCounts = {};
+            window.totalSubmissions = data.submissions ? data.submissions.length : 0;
+            
+            if (data.submissions) {
+                data.submissions.forEach(submission => {
+                    if (submission.submission_nodes) {
+                        let me = submission.submission_nodes;
+                        //remove duplicates of me
+                        me = [...new Set(me)];
+                        me.forEach(nodeId => {
+                            window.nodeUsageCounts[nodeId] = (window.nodeUsageCounts[nodeId] || 0) + 1;
+                        });
+                    }
+                });
+            }
+            
             // Debug: Check if initializeGraph is available
             console.log('initializeGraph available:', typeof initializeGraph);
             console.log('window.initializeGraph available:', typeof window.initializeGraph);
@@ -398,8 +415,30 @@ function highlightMultipleSubmissions(submissionUids) {
     const svg = d3.select('#graph-container svg');
     if (svg.empty()) return;
     
-    svg.selectAll('.node circle').attr('stroke', '#fff').attr('stroke-width', 2);
+    svg.selectAll('.node circle')
+        .attr('stroke', '#000000')
+        .attr('stroke-width', 2)
+        .attr('fill', d => {
+            // Preserve the usage-based color for all node types
+            const usageCount = window.nodeUsageCounts[d.id] || 0;
+            const usageProportion = window.totalSubmissions > 0 ? usageCount / window.totalSubmissions : 0;
+            if (usageProportion === 0) return '#ffffff'; // White for 0% usage
+            if (usageProportion === 1) return '#000000'; // Black for 100% usage
+            
+            // Calculate grey intensity based on usage proportion
+            // Lighter grey (closer to white) for lower usage
+            // Darker grey (closer to black) for higher usage
+            const intensity = Math.floor(usageProportion * 128) + 127; // Range from 127 to 255
+            const greyValue = 255 - intensity; // Invert so higher usage = darker
+            return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
+        });
     svg.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
+    
+    // Preserve X marks for incorrect nodes during reset
+    svg.selectAll('.node')
+        .filter(d => d.type === 'process' && !d.is_correct)
+        .select('text')
+        .attr('fill', '#ff0000');
     
     // Hide all tooltips
     svg.selectAll('.node')
@@ -432,7 +471,26 @@ function highlightMultipleSubmissions(submissionUids) {
     
     highlightedNodes.select('circle')
         .attr('stroke', '#ffc107')
-        .attr('stroke-width', 4);
+        .attr('stroke-width', 4)
+        .attr('fill', d => {
+            // Preserve the usage-based color for all node types
+            const usageCount = window.nodeUsageCounts[d.id] || 0;
+            const usageProportion = window.totalSubmissions > 0 ? usageCount / window.totalSubmissions : 0;
+            if (usageProportion === 0) return '#ffffff'; // White for 0% usage
+            if (usageProportion === 1) return '#000000'; // Black for 100% usage
+            
+            // Calculate grey intensity based on usage proportion
+            // Lighter grey (closer to white) for lower usage
+            // Darker grey (closer to black) for higher usage
+            const intensity = Math.floor(usageProportion * 128) + 127; // Range from 127 to 255
+            const greyValue = 255 - intensity; // Invert so higher usage = darker
+            return `rgb(${greyValue}, ${greyValue}, ${greyValue})`;
+        });
+    
+    // Preserve X marks for incorrect nodes during highlighting
+    highlightedNodes.filter(d => d.type === 'process' && !d.is_correct)
+        .select('text')
+        .attr('fill', '#ff0000');
     
     // Don't show tooltips when highlighting - only show on hover
     
@@ -750,6 +808,23 @@ function loadTreeLayout() {
             currentGraphData = data;
             window.graphData = data;
             
+            // Calculate node usage counts for highlighting functions
+            window.nodeUsageCounts = {};
+            window.totalSubmissions = data.submissions ? data.submissions.length : 0;
+            
+            if (data.submissions) {
+                data.submissions.forEach(submission => {
+                    if (submission.submission_nodes) {
+                        let me = submission.submission_nodes;
+                        //remove duplicates of me
+                        me = [...new Set(me)];
+                        me.forEach(nodeId => {
+                            window.nodeUsageCounts[nodeId] = (window.nodeUsageCounts[nodeId] || 0) + 1;
+                        });
+                    }
+                });
+            }
+            
             // Initialize the graph with tree layout
             console.log('Initializing tree graph...');
             console.log('initializeGraph available:', typeof initializeGraph);
@@ -809,6 +884,23 @@ function loadDAGLayout() {
             console.log('DAG layout data received:', data);
             currentGraphData = data;
             window.graphData = data;
+            
+            // Calculate node usage counts for highlighting functions
+            window.nodeUsageCounts = {};
+            window.totalSubmissions = data.submissions ? data.submissions.length : 0;
+            
+            if (data.submissions) {
+                data.submissions.forEach(submission => {
+                    if (submission.submission_nodes) {
+                        let me = submission.submission_nodes;
+                        //remove duplicates of me
+                        me = [...new Set(me)];
+                        me.forEach(nodeId => {
+                            window.nodeUsageCounts[nodeId] = (window.nodeUsageCounts[nodeId] || 0) + 1;
+                        });
+                    }
+                });
+            }
             
             // Initialize the graph with DAG layout
             console.log('Initializing DAG graph...');

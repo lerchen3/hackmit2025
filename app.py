@@ -493,11 +493,9 @@ Please generate personalized feedback that:
 1. Acknowledges the student's specific approach and work
 2. Points out what they did well
 3. Identifies specific areas for improvement
-4. Provides constructive suggestions
-5. Maintains an encouraging and supportive tone
-6. Is specific to their solution, not generic
+4. Provides specific, concise, and meaningful feedback
 
-Keep the feedback concise but meaningful (2-3 paragraphs). Focus on being helpful and encouraging while providing actionable guidance."""
+Keep the feedback concise but meaningful (1 paragraphs). Focus on being helpful and encouraging while providing actionable guidance."""
 
             # Generate personalized feedback using LLM
             llm_response = None
@@ -505,7 +503,7 @@ Keep the feedback concise but meaningful (2-3 paragraphs). Focus on being helpfu
                 llm_response = api_manager.query({
                     "model": "gpt-4o-mini",
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
+                    "max_tokens": 100,
                     "temperature": 0.7
                 })
             
