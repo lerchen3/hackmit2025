@@ -1,5 +1,5 @@
 {
-  "provider": "vllm",
+  "provider": "local",
   "prompt_type": "concise",
   "step_size": "small",
   "concise_hint": "Really don't overthink too hard and be concise in your final output.",

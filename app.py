@@ -5,6 +5,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+import csv
+import io
 import json
 from dotenv import load_dotenv
 import csv
@@ -165,6 +167,67 @@ def teacher_dashboard():
     total_solutions = sum(len(assignment.solutions) for assignment in assignments)
     
     return render_template('teacher_dashboard.html', assignments=assignments, students=students, total_solutions=total_solutions)
+
+@app.route('/teacher/students/upload-csv', methods=['POST'])
+@login_required
+def upload_students_csv():
+    if not current_user.is_teacher:
+        flash('Access denied', 'error')
+        return redirect(url_for('student_dashboard'))
+
+    if 'csv_file' not in request.files:
+        flash('No file part in request', 'error')
+        return redirect(url_for('teacher_dashboard'))
+
+    file = request.files['csv_file']
+    if file.filename == '':
+        flash('No selected file', 'error')
+        return redirect(url_for('teacher_dashboard'))
+
+    try:
+        # Read as text
+        stream = io.StringIO(file.stream.read().decode('utf-8', errors='ignore'))
+        reader = csv.DictReader(stream)
+        created = 0
+        ensured = 0
+
+        # Helper to generate new usernames like quail_1, quail_2, ...
+        def generate_quail_username(start_index: int = 1) -> str:
+            i = start_index
+            while True:
+                candidate = f"quail_{i}"
+                if not User.query.filter_by(username=candidate).first():
+                    return candidate
+                i += 1
+
+        next_quail_index = 1
+
+        for row in reader:
+            student_id = (row.get('student_id') or '').strip()
+            if not student_id:
+                student_id = generate_quail_username(next_quail_index)
+                # try to advance next_quail_index to reduce collisions
+                try:
+                    next_quail_index = int(student_id.split('_')[-1]) + 1
+                except Exception:
+                    pass
+
+            user = User.query.filter_by(username=student_id).first()
+            if not user:
+                user = User(username=student_id, password_hash=None, is_teacher=False)
+                db.session.add(user)
+                created += 1
+            else:
+                ensured += 1
+
+        db.session.commit()
+        flash(f'Processed CSV. Created {created} students, ensured {ensured} existing.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Failed to process CSV', 'error')
+        print(f"CSV upload error: {e}")
+
+    return redirect(url_for('teacher_dashboard'))
 
 @app.route('/student/dashboard')
 @login_required
