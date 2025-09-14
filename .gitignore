@@ -2,3 +2,10 @@ env/
 instance/
 uploads/
 __pycache__/
+.env
+*.log
+*.pid
+cloudflared
+uploads/
+instance/
+.venv

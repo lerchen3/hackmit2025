@@ -7,6 +7,8 @@ import os
 from datetime import datetime
 import json
 from dotenv import load_dotenv
+import csv
+import time
 from graph_manager import graph_manager
 from apimanager import APIManager
 
@@ -501,9 +503,8 @@ Keep the feedback concise but meaningful (1 paragraphs). Focus on being helpful 
             llm_response = None
             if api_manager:
                 llm_response = api_manager.query({
-                    "model": "gpt-4o-mini",
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 100,
+                    "max_tokens": 1000,
                     "temperature": 0.7
                 })
             
@@ -540,53 +541,125 @@ def submit_solutions_for_students(assignment_id):
     
     if request.method == 'POST':
         try:
-            # Get form data
-            solutions_data = request.form.get('solutions_data')
-            if not solutions_data:
-                flash('No solution data provided', 'error')
-                return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
-            
-            import json
-            solutions = json.loads(solutions_data)
-            
-            # Process each solution
             created_solutions = []
-            for solution_data in solutions:
-                student_id = solution_data.get('student_id')
-                solution_text = solution_data.get('solution_text', '')
-                final_answer = solution_data.get('final_answer', '')
-                
-                if not student_id or (not solution_text and not final_answer):
-                    continue
-                
-                # Check if solution already exists for this student
-                existing_solution = Solution.query.filter_by(
-                    assignment_id=assignment_id,
-                    student_id=student_id
-                ).first()
-                
-                if existing_solution:
-                    # Update existing solution
-                    existing_solution.solution_text = solution_text
-                    existing_solution.final_answer = final_answer
-                    existing_solution.submitted_at = datetime.utcnow()
-                    created_solutions.append(existing_solution)
-                else:
-                    # Create new solution
-                    solution = Solution(
+
+            # CSV upload path
+            csv_file = request.files.get('solutions_csv')
+            if csv_file and csv_file.filename:
+                # Optional explicit student_ids mapping; supports JSON list or comma-separated
+                raw_student_ids = request.form.get('student_ids')
+                mapped_students = []
+                if raw_student_ids:
+                    try:
+                        if raw_student_ids.strip().startswith('['):
+                            ids = json.loads(raw_student_ids)
+                        else:
+                            ids = [int(x) for x in raw_student_ids.split(',') if x.strip()]
+                        # Fetch students preserving provided order
+                        id_to_student = {u.id: u for u in User.query.filter(User.id.in_(ids)).all()}
+                        mapped_students = [id_to_student.get(i) for i in ids if i in id_to_student]
+                    except Exception:
+                        mapped_students = []
+                if not mapped_students:
+                    # Default: all non-teacher students sorted by username
+                    mapped_students = User.query.filter_by(is_teacher=False).order_by(User.username.asc()).all()
+
+                # Parse CSV
+                content = csv_file.read().decode('utf-8', errors='ignore')
+                reader = csv.DictReader(content.splitlines())
+                rows = list(reader)
+                if not rows:
+                    flash('CSV appears empty.', 'error')
+                    return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
+                missing_cols = [c for c in ["Solution", "Final_Answer"] if c not in reader.fieldnames]
+                if missing_cols:
+                    flash(f"CSV missing required columns: {', '.join(missing_cols)}", 'error')
+                    return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
+
+                limit = min(len(rows), len(mapped_students))
+                if len(rows) != len(mapped_students):
+                    flash(f"Note: pairing first {limit} row(s) to {limit} student(s) by order.", 'warning')
+
+                for idx in range(limit):
+                    row = rows[idx]
+                    student = mapped_students[idx]
+                    if not student:
+                        continue
+                    solution_text = (row.get('Solution') or '').strip()
+                    final_answer = (row.get('Final_Answer') or '').strip()
+                    if not solution_text and not final_answer:
+                        continue
+
+                    existing_solution = Solution.query.filter_by(
                         assignment_id=assignment_id,
-                        student_id=student_id,
-                        solution_text=solution_text,
-                        final_answer=final_answer
-                    )
-                    db.session.add(solution)
-                    created_solutions.append(solution)
-            
-            db.session.commit()
+                        student_id=student.id
+                    ).first()
+
+                    if existing_solution:
+                        existing_solution.solution_text = solution_text
+                        existing_solution.final_answer = final_answer
+                        existing_solution.submitted_at = datetime.utcnow()
+                        db.session.commit()
+                        created_solutions.append(existing_solution)
+                    else:
+                        solution = Solution(
+                            assignment_id=assignment_id,
+                            student_id=student.id,
+                            solution_text=solution_text,
+                            final_answer=final_answer
+                        )
+                        db.session.add(solution)
+                        db.session.commit()
+                        created_solutions.append(solution)
+
+                    # 10ms delay between rows
+                    time.sleep(0.01)
+
+            else:
+                # JSON form field path (existing behavior)
+                solutions_data = request.form.get('solutions_data')
+                if not solutions_data:
+                    flash('No solution data provided', 'error')
+                    return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
+
+                solutions = json.loads(solutions_data)
+
+                for solution_data in solutions:
+                    student_id = solution_data.get('student_id')
+                    solution_text = solution_data.get('solution_text', '')
+                    final_answer = solution_data.get('final_answer', '')
+
+                    if not student_id or (not solution_text and not final_answer):
+                        continue
+
+                    existing_solution = Solution.query.filter_by(
+                        assignment_id=assignment_id,
+                        student_id=student_id
+                    ).first()
+
+                    if existing_solution:
+                        existing_solution.solution_text = solution_text
+                        existing_solution.final_answer = final_answer
+                        existing_solution.submitted_at = datetime.utcnow()
+                        db.session.commit()
+                        created_solutions.append(existing_solution)
+                    else:
+                        solution = Solution(
+                            assignment_id=assignment_id,
+                            student_id=student_id,
+                            solution_text=solution_text,
+                            final_answer=final_answer
+                        )
+                        db.session.add(solution)
+                        db.session.commit()
+                        created_solutions.append(solution)
             
             # Process solutions with graph manager
             for solution in created_solutions:
                 try:
+                    # Ensure relationship for username
+                    if not getattr(solution, 'student', None):
+                        solution.student = User.query.get(solution.student_id)
                     solution_uid = f"{solution.student.username}_{solution.id}"
                     problem_text = assignment.description_text or ""
                     graph_manager.process_solution(
@@ -601,10 +674,9 @@ def submit_solutions_for_students(assignment_id):
                 except Exception as e:
                     print(f"Error processing solution with graph manager: {e}")
                     # Don't fail the submission if graph processing fails
-            
+
             flash(f'Successfully submitted {len(created_solutions)} solution(s) for students!', 'success')
             return redirect(url_for('view_solutions', assignment_id=assignment_id))
-            
         except Exception as e:
             db.session.rollback()
             flash('Error submitting solutions. Please try again.', 'error')

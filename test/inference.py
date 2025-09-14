@@ -1,5 +1,5 @@
 # serve command:
-# vllm serve Qwen/Qwen3-30B-A3B-Instruct-2507 --host 0.0.0.0 --port 8000 --dtype auto --tensor-parallel-size 8 --max-model-len 8192 --api-key test-123
+# vllm serve Qwen/Qwen3-235B-A22B-FP8 --host 0.0.0.0 --port 8000 --dtype auto --tensor-parallel-size 8 --enable-expert-parallel --max-model-len 8192 --api-key test-123
 
 
 # run script: python3 test/inference.py

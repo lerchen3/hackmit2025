@@ -19,12 +19,42 @@ Dependencies:
 - numpy: For numerical operations and array handling
 - apimanager: Custom API manager for LLM queries and text embeddings
 
-Author: HackMIT 2025 Team
+Author: HackMIT 2025 Next 3W Team
 """
 
 from faiss import IndexFlatL2
 import numpy as np
 from apimanager import APIManager
+import os
+import json
+
+# --- Configuration loader ----------------------------------------------------
+def _load_config() -> dict:
+    cfg_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "config.json"))
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+_CONFIG = _load_config()
+_STEP_SIZE = str(_CONFIG.get("step_size", "medium")).strip().lower()
+_STEP_SIZE_GUIDANCE = {
+    "small": (
+        "Step size preference: small. Make steps granular; split on any nontrivial "
+        "algebraic manipulation, substitution, or inference."
+    ),
+    "medium": (
+        "Step size preference: medium. Group closely related moves; split when the "
+        "approach changes or at key insights."
+    ),
+    "large": (
+        "Step size preference: large. Prefer bigger, high-level steps; only split "
+        "at major technique changes."
+    ),
+}
+_STEP_GUIDANCE_TEXT = _STEP_SIZE_GUIDANCE.get(_STEP_SIZE, _STEP_SIZE_GUIDANCE["medium"])
+
 
 
 class SolutionGraph:
@@ -295,41 +325,34 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
                 self.solution_is_correct[dup_idx] = True
             return True
 
-        # Use LLM to break the solution into structured steps
-        response = self.api_manager.query(
-            [
-                {
-                    "role": "system",
-                    "content": r"""You are a solution explainer.
-
-Your task is to take a complete solution and reformat it into large, structured steps. Steps should be split before statements that change the course of the solution or require deep insight and a new idea.
-Do not add new reasoning or solve the problem yourself — just restructure what is already there.  
-
-For each step:  
-- Give a short **title** (what technique/formula/idea is applied).  
-- If applicable, show the **general formula or theorem**.  
-- Summarize the **reasoning/work** for that step.  
-- Do not create extra steps for trivial algebra, computation, or obvious logical steps.  
-- Use inline LaTeX only. Do not use block LaTeX.
-
-At the end, include the **final result**.
-
-Format it like this:
-
-### Step 1. [Technique / Formula Name]
-Formula: ...  
-Reasoning: ...
-
-### Step 2. [Technique / Formula Name]
-Formula: ...  
-Reasoning: ...
-
-...
-""",
-                },
-                {"role": "user", "content": solution_text},
-            ]
-        )
+        response = self.api_manager.query([
+            {
+                "role": "system",
+                "content": (
+                    "You are a solution explainer.\n\n"
+                    + _STEP_GUIDANCE_TEXT
+                    + "\n\nYour task is to take a complete solution and reformat it into structured steps. "
+                      "Steps should be split before statements that change the course of the solution or "
+                      "require a new idea. Do not add new reasoning or solve the problem yourself — just "
+                      "restructure what is already there.\n\n"
+                      "For each step:\n"
+                      "- Give a short **title** (what technique/formula/idea is applied).\n"
+                      "- If applicable, show the **general formula or theorem**.\n"
+                      "- Summarize the **reasoning/work** for that step.\n"
+                      "- Use inline LaTeX only (no block LaTeX).\n\n"
+                      "At the end, include the **final result**.\n\n"
+                      "Format it like this:\n\n"
+                      "### Step 1. [Technique / Formula Name]\n"
+                      "Formula: ...  \n"
+                      "Reasoning: ...\n\n"
+                      "### Step 2. [Technique / Formula Name]\n"
+                      "Formula: ...  \n"
+                      "Reasoning: ...\n\n"
+                      "..."
+                ),
+            },
+            {"role": "user", "content": solution_text},
+        ])
 
         if response is None:
             print("Failed to receive step breakdown from API.")
@@ -771,7 +794,7 @@ class SolutionTree:
                     [
                         {
                             "role": "system",
-                            "content": f"You will be given a solution to a math problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string.",
+                            "content": f"You will be given a solution to a {self.subject_domain} problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string.",
                         },
                         {
                             "role": "user",
@@ -800,7 +823,7 @@ class SolutionTree:
                     # Move the existing child under the new shared node
                     cur_node.children[-1].children.append(cur_node.children[res])
                     cur_node.children[res].parent_summary = unshared1
-
+                    
                     # Swap positions and remove the old reference
                     cur_node.children[-1], cur_node.children[res] = (
                         cur_node.children[res],
@@ -808,7 +831,6 @@ class SolutionTree:
                     )
                     cur_node.children.pop()
                     cur_node = cur_node.children[res]  # Move to the shared node
-
                     nodeList.append(cur_node)
                 
                 # Add the new solution as a sibling to the existing child
