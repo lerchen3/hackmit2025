@@ -393,6 +393,10 @@ class SolutionTree:
                         print("Invalid response format from API.")
                         return False
                     res = int(parts[1].strip()) - 1  # Convert to 0-based indexing
+                    if res < 0:
+                        res = 0
+                    if res >= len(cur_node.children):
+                        res = len(cur_node.children) - 1
                     if res < 0 or res >= len(cur_node.children):
                         print(f"Invalid index {res+1} from API response. Must be between 1 and {len(cur_node.children)}.")
                         return False

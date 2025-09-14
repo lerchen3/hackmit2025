@@ -247,15 +247,35 @@
             <form id="feedback-form">
                 <div class="mb-4">
                     <label for="feedback-text" class="block text-sm font-medium text-gray-700 mb-2">
-                        Feedback Message
+                        Base Feedback Message
                     </label>
                     <textarea id="feedback-text" 
                               name="feedback_text" 
-                              rows="6" 
+                              rows="4" 
                               class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
-                              placeholder="Enter your feedback for the selected students..."
+                              placeholder="Enter your base feedback message. AI will personalize this for each student..."
                               required></textarea>
                 </div>
+                
+                <!-- Personalized Feedback Section -->
+                <div class="mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-sm font-medium text-gray-700">
+                            Personalized Feedback Preview
+                        </label>
+                        <button type="button" 
+                                id="generate-personalized-btn"
+                                class="px-3 py-1 text-xs font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                            <i class="fas fa-magic mr-1"></i>Generate Personalized
+                        </button>
+                    </div>
+                    <div id="personalized-feedback-container" class="space-y-3 max-h-64 overflow-y-auto">
+                        <div class="text-sm text-gray-500 italic text-center py-4">
+                            Click "Generate Personalized" to see AI-generated feedback for each student
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="flex justify-end space-x-3">
                     <button type="button" 
                             onclick="closeFeedbackModal()" 
@@ -263,6 +283,7 @@
                         Cancel
                     </button>
                     <button type="submit" 
+                            id="submit-feedback-btn"
                             class="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                         Submit Feedback
                     </button>
@@ -467,6 +488,106 @@ function openFeedbackModal() {
 
 function closeFeedbackModal() {
     document.getElementById('feedbackModal').classList.add('hidden');
+    // Clear personalized feedbacks when closing modal
+    personalizedFeedbacks = {};
+    document.getElementById('personalized-feedback-container').innerHTML = '<div class="text-sm text-gray-500 italic text-center py-4">Click "Generate Personalized" to see AI-generated feedback for each student</div>';
+}
+
+// Store personalized feedbacks for submission
+let personalizedFeedbacks = {};
+
+// Handle personalized feedback generation
+document.getElementById('generate-personalized-btn').addEventListener('click', async function() {
+    const selectedCheckboxes = document.querySelectorAll('#student-list input[type="checkbox"]:checked');
+    const studentIds = Array.from(selectedCheckboxes).map(checkbox => {
+        return parseInt(checkbox.value.split('_')[2]); // Extract student ID (username_solutionId_studentId)
+    });
+    
+    const baseFeedback = document.getElementById('feedback-text').value.trim();
+    
+    if (!baseFeedback) {
+        alert('Please enter base feedback text first.');
+        return;
+    }
+    
+    if (studentIds.length === 0) {
+        alert('Please select at least one student.');
+        return;
+    }
+    
+    // Show loading state
+    const generateBtn = document.getElementById('generate-personalized-btn');
+    const originalText = generateBtn.innerHTML;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Generating...';
+    generateBtn.disabled = true;
+    
+    const container = document.getElementById('personalized-feedback-container');
+    container.innerHTML = '<div class="text-sm text-gray-500 italic text-center py-4"><i class="fas fa-spinner fa-spin mr-2"></i>Generating personalized feedback...</div>';
+    
+    try {
+        const response = await fetch('/api/generate-personalized-feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                assignment_id: parseInt('{{ assignment.id }}'),
+                student_ids: studentIds,
+                base_feedback: baseFeedback
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            personalizedFeedbacks = result.personalized_feedbacks;
+            displayPersonalizedFeedbacks(result.personalized_feedbacks);
+        } else {
+            container.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Error: ' + result.error + '</div>';
+        }
+    } catch (error) {
+        console.error('Error generating personalized feedback:', error);
+        container.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Failed to generate personalized feedback. Please try again.</div>';
+    } finally {
+        // Reset button state
+        generateBtn.innerHTML = originalText;
+        generateBtn.disabled = false;
+    }
+});
+
+// Display personalized feedbacks
+function displayPersonalizedFeedbacks(feedbacks) {
+    const container = document.getElementById('personalized-feedback-container');
+    container.innerHTML = '';
+    
+    Object.entries(feedbacks).forEach(([studentId, feedback]) => {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = 'border border-gray-200 rounded-lg p-3 bg-gray-50';
+        feedbackDiv.innerHTML = `
+            <div class="flex items-start justify-between mb-2">
+                <h4 class="text-sm font-medium text-gray-900">${feedback.student_name}</h4>
+                <button type="button" 
+                        onclick="editPersonalizedFeedback(${studentId})"
+                        class="text-xs text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>
+            <div class="text-sm text-gray-700 whitespace-pre-wrap">${feedback.personalized_feedback}</div>
+        `;
+        container.appendChild(feedbackDiv);
+    });
+}
+
+// Edit personalized feedback
+function editPersonalizedFeedback(studentId) {
+    const currentFeedback = personalizedFeedbacks[studentId];
+    if (!currentFeedback) return;
+    
+    const newFeedback = prompt(`Edit feedback for ${currentFeedback.student_name}:`, currentFeedback.personalized_feedback);
+    if (newFeedback !== null) {
+        personalizedFeedbacks[studentId].personalized_feedback = newFeedback;
+        displayPersonalizedFeedbacks(personalizedFeedbacks);
+    }
 }
 
 // Handle feedback form submission
@@ -478,39 +599,88 @@ document.getElementById('feedback-form').addEventListener('submit', async functi
         return parseInt(checkbox.value.split('_')[2]); // Extract student ID (username_solutionId_studentId)
     });
     
-    const feedbackText = document.getElementById('feedback-text').value.trim();
+    const baseFeedback = document.getElementById('feedback-text').value.trim();
     
-    if (!feedbackText) {
-        alert('Please enter feedback text.');
+    if (!baseFeedback) {
+        alert('Please enter base feedback text.');
         return;
     }
     
-    try {
-        const response = await fetch('/teacher/feedback/bulk', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                assignment_id: parseInt('{{ assignment.id }}'),
-                student_ids: studentIds,
-                feedback_text: feedbackText
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-            alert(result.message);
-            closeFeedbackModal();
-            // Optionally refresh the page to show updated feedback count
-            location.reload();
-        } else {
-            alert('Error: ' + result.error);
+    // Check if we have personalized feedbacks
+    const hasPersonalized = Object.keys(personalizedFeedbacks).length > 0;
+    
+    if (hasPersonalized) {
+        // Submit personalized feedbacks individually
+        try {
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (const [studentId, feedback] of Object.entries(personalizedFeedbacks)) {
+                if (studentIds.includes(parseInt(studentId))) {
+                    try {
+                        const response = await fetch('/teacher/feedback/bulk', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                assignment_id: parseInt('{{ assignment.id }}'),
+                                student_ids: [parseInt(studentId)],
+                                feedback_text: feedback.personalized_feedback
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        console.error(`Error submitting feedback for student ${studentId}:`, error);
+                        errorCount++;
+                    }
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(`Successfully submitted personalized feedback to ${successCount} student(s)${errorCount > 0 ? ` (${errorCount} failed)` : ''}.`);
+                closeFeedbackModal();
+                location.reload();
+            } else {
+                alert('Failed to submit any feedback. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error submitting personalized feedback:', error);
+            alert('Failed to submit personalized feedback. Please try again.');
         }
-    } catch (error) {
-        console.error('Error submitting feedback:', error);
-        alert('Failed to submit feedback. Please try again.');
+    } else {
+        // Submit base feedback to all selected students
+        try {
+            const response = await fetch('/teacher/feedback/bulk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    assignment_id: parseInt('{{ assignment.id }}'),
+                    student_ids: studentIds,
+                    feedback_text: baseFeedback
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert(result.message);
+                closeFeedbackModal();
+                location.reload();
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            alert('Failed to submit feedback. Please try again.');
+        }
     }
 });
 

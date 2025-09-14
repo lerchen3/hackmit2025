@@ -8,6 +8,7 @@ from datetime import datetime
 import json
 from dotenv import load_dotenv
 from graph_manager import graph_manager
+from apimanager import APIManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +28,13 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Initialize API manager for LLM operations
+try:
+    api_manager = APIManager("bnxe")
+except Exception as e:
+    print(f"Warning: Could not initialize API manager: {e}")
+    api_manager = None
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -419,6 +427,108 @@ def submit_bulk_feedback():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to submit feedback'}), 500
+
+@app.route('/api/generate-personalized-feedback', methods=['POST'])
+@login_required
+def generate_personalized_feedback():
+    if not current_user.is_teacher:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    data = request.get_json()
+    assignment_id = data.get('assignment_id')
+    student_ids = data.get('student_ids', [])
+    base_feedback = data.get('base_feedback', '')
+    
+    if not assignment_id or not student_ids or not base_feedback:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    try:
+        # Get assignment details
+        assignment = Assignment.query.get(assignment_id)
+        if not assignment:
+            return jsonify({'error': 'Assignment not found'}), 404
+        
+        # Get solutions for selected students
+        solutions = Solution.query.filter(
+            Solution.assignment_id == assignment_id,
+            Solution.student_id.in_(student_ids)
+        ).all()
+        
+        if not solutions:
+            return jsonify({'error': 'No solutions found for selected students'}), 404
+        
+        # Generate personalized feedback for each student
+        personalized_feedbacks = {}
+        
+        for solution in solutions:
+            student = User.query.get(solution.student_id)
+            if not student:
+                continue
+                
+            # Prepare context for LLM
+            context = {
+                "assignment_title": assignment.title,
+                "assignment_description": assignment.description_text or "",
+                "correct_answer": assignment.correct_answer,
+                "student_username": student.username,
+                "student_solution": solution.solution_text or "",
+                "student_final_answer": solution.final_answer or "",
+                "base_feedback": base_feedback
+            }
+            
+            # Create prompt for personalized feedback
+            prompt = f"""You are an experienced teacher providing personalized feedback to students. Based on the following information, generate specific, constructive feedback for the student.
+
+Assignment: {context['assignment_title']}
+Description: {context['assignment_description']}
+Correct Answer: {context['correct_answer']}
+
+Student: {context['student_username']}
+Student's Solution: {context['student_solution']}
+Student's Final Answer: {context['student_final_answer']}
+
+Base Feedback from Teacher: {context['base_feedback']}
+
+Please generate personalized feedback that:
+1. Acknowledges the student's specific approach and work
+2. Points out what they did well
+3. Identifies specific areas for improvement
+4. Provides constructive suggestions
+5. Maintains an encouraging and supportive tone
+6. Is specific to their solution, not generic
+
+Keep the feedback concise but meaningful (2-3 paragraphs). Focus on being helpful and encouraging while providing actionable guidance."""
+
+            # Generate personalized feedback using LLM
+            llm_response = None
+            if api_manager:
+                llm_response = api_manager.query({
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 500,
+                    "temperature": 0.7
+                })
+            
+            if llm_response:
+                personalized_feedbacks[solution.student_id] = {
+                    "student_name": student.username,
+                    "personalized_feedback": llm_response.strip()
+                }
+            else:
+                # Fallback to base feedback if LLM fails
+                personalized_feedbacks[solution.student_id] = {
+                    "student_name": student.username,
+                    "personalized_feedback": base_feedback
+                }
+        
+        return jsonify({
+            'success': True,
+            'personalized_feedbacks': personalized_feedbacks
+        })
+        
+    except Exception as e:
+        print(f"Error generating personalized feedback: {e}")
+        return jsonify({'error': 'Failed to generate personalized feedback'}), 500
 
 @app.route('/teacher/assignment/<int:assignment_id>/submit-solutions', methods=['GET', 'POST'])
 @login_required
