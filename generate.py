@@ -1,10 +1,6 @@
 
-HARD_QN = """
-Let $\triangle$$ABC$ have incenter $I$, circumcenter $O$, inradius $6$, and circumradius $13$. Suppose that $\overline{IA} \perp \overline{OI}$. Find $AB \cdot AC$.
-"""
-
-EASY_QN = """
-Let $ABCDEF$ be a convex equilateral hexagon in which all pairs of opposite sides are parallel. The triangle whose sides are extensions of segments $AB$, $CD$, and $EF$ has side lengths $200$, $240$, and $300$. Find the side length of the hexagon.
+QN = """
+Find the sum of all positive integers $n$ such that when $1^3+2^3+3^3+\cdots +n^3$ is divided by $n+5$, the remainder is $17$.
 """
 
 if __name__ == "__main__":
