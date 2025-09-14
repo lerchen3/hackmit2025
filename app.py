@@ -772,7 +772,12 @@ def process_existing_solutions():
     """Process existing solutions with the graph manager"""
     try:
         solutions = Solution.query.all()
+        print(f"Processing {len(solutions)} existing solutions")
+        # print(solutions[11])
+        # solutions = [solutions[12]]
         for solution in solutions:
+            # if solution.assignment_id != 6:
+            #     continue
             assignment = Assignment.query.get(solution.assignment_id)
             if assignment:
                 solution_file_path = None
@@ -790,6 +795,8 @@ def process_existing_solutions():
                     correct_answer=assignment.correct_answer,
                     problem_text=problem_text
                 )
+            else:
+                print("FAIL", solution.assignment_id, solution.student_id)
         print(f"Processed {len(solutions)} existing solutions")
     except Exception as e:
         print(f"Error processing existing solutions: {e}")
@@ -802,4 +809,4 @@ if __name__ == '__main__':
         process_existing_solutions()
     
     # Start the app
-    app.run(debug=True, host='0.0.0.0', port=5003)
+    app.run(debug=False, host='0.0.0.0', port=5003)

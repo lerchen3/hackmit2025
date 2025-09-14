@@ -635,8 +635,7 @@ class SolutionTree:
             else:
                 node_summaries[node.creation_index] = "Beginning of Solution"
 
-            # Store correctness information
-            node_correctness[node.creation_index] = node.is_correct
+            
 
             # Record solution paths that terminate at this node
             if hasattr(node, "terminal") and node.terminal:
@@ -649,6 +648,11 @@ class SolutionTree:
                 dfs(child)
             
             stack.pop()  # Backtrack
+
+            node.pull_correctness()
+
+            # Store correctness information
+            node_correctness[node.creation_index] = node.is_correct
 
         # Start DFS traversal from root
         dfs(self.root)
@@ -693,6 +697,7 @@ class SolutionTree:
             if len(cur_node.children) == 0:
                 cur_node.children.append(self.Node(solution_text, self.numNodes))
                 self.numNodes += 1
+                cur_node = cur_node.children[0]
                 break
                 
             # Find the most similar child node using LLM matching
@@ -760,7 +765,7 @@ class SolutionTree:
                     [
                         {
                             "role": "system",
-                            "content": f"You will be given two solutions to a math problem. Task: Find the largest prefix of steps shared by both solutions, verifying equal intermediate values. Respond with only the shared prefix.",
+                            "content": f"You will be given two solutions to a math problem. Task: Find the largest prefix of steps shared by both solutions, verifying equal intermediate values. Respond with only the shared prefix. If no such prefix exists, respond with an empty string and no other text.",
                         },
                         {
                             "role": "user",

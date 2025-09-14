@@ -419,7 +419,11 @@ function highlightMultipleSubmissions(submissionUids) {
         .attr('stroke', '#000000')
         .attr('stroke-width', 2)
         .attr('fill', d => {
-            // Preserve the usage-based color for all node types
+            // Start and end nodes are always white
+            if (d.type === 'start' || d.type === 'end') {
+                return '#ffffff';
+            }
+            // Process nodes use usage-based color
             const usageCount = window.nodeUsageCounts[d.id] || 0;
             const usageProportion = window.totalSubmissions > 0 ? usageCount / window.totalSubmissions : 0;
             if (usageProportion === 0) return '#ffffff'; // White for 0% usage
@@ -473,7 +477,11 @@ function highlightMultipleSubmissions(submissionUids) {
         .attr('stroke', '#ffc107')
         .attr('stroke-width', 4)
         .attr('fill', d => {
-            // Preserve the usage-based color for all node types
+            // Start and end nodes are always white
+            if (d.type === 'start' || d.type === 'end') {
+                return '#ffffff';
+            }
+            // Process nodes use usage-based color
             const usageCount = window.nodeUsageCounts[d.id] || 0;
             const usageProportion = window.totalSubmissions > 0 ? usageCount / window.totalSubmissions : 0;
             if (usageProportion === 0) return '#ffffff'; // White for 0% usage

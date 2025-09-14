@@ -461,6 +461,11 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
     node.append('circle')
         .attr('r', 20)
         .attr('fill', d => {
+            // Start and end nodes are always white
+            if (d.type === 'start' || d.type === 'end') {
+                return '#ffffff';
+            }
+            // Process nodes use usage-based coloring
             const usageCount = nodeUsageCounts[d.id] || 0;
             const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
             return getUsageColor(usageProportion);
@@ -488,6 +493,32 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         .attr('font-weight', 'bold')
         .attr('fill', '#ff0000')
         .text('✕');
+
+    // Add start icon (play symbol) for start nodes
+    node.filter(d => d.type === 'start')
+        .append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Arial, sans-serif')
+        .attr('font-size', '14px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#000000')
+        .text('▶');
+
+    // Add end icon (flag) for end nodes
+    node.filter(d => d.type === 'end')
+        .append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Arial, sans-serif')
+        .attr('font-size', '14px')
+        .attr('font-weight', 'bold')
+        .attr('fill', '#000000')
+        .text('🏁');
 
     // Add invisible larger circle for easier hovering on process nodes
     node.filter(d => d.type === 'process')
@@ -778,7 +809,11 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         // Reset all nodes and links first
         node.select('circle').attr('stroke', '#000000').attr('stroke-width', 2)
         .attr('fill', d => {
-            // Restore usage-based fill colors for all node types
+            // Start and end nodes are always white
+            if (d.type === 'start' || d.type === 'end') {
+                return '#ffffff';
+            }
+            // Process nodes use usage-based fill colors
             const usageCount = nodeUsageCounts[d.id] || 0;
             const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
             return getUsageColor(usageProportion);
@@ -819,7 +854,11 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             .attr('stroke', '#ffc107')
             .attr('stroke-width', 4)
             .attr('fill', d => {
-                // Preserve the usage-based color for all node types
+                // Start and end nodes are always white
+                if (d.type === 'start' || d.type === 'end') {
+                    return '#ffffff';
+                }
+                // Process nodes use usage-based color
                 const usageCount = nodeUsageCounts[d.id] || 0;
                 const usageProportion = totalSubmissions > 0 ? usageCount / totalSubmissions : 0;
                 return getUsageColor(usageProportion);

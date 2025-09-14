@@ -41,8 +41,11 @@ class GraphManager:
     
     def process_solution(self, assignment_id, solution_uid, solution_text, solution_file_path, final_answer, correct_answer, problem_text=""):
         """Process a student solution and add it to both graph and tree."""
+        print(f"Processing solution for assignment {assignment_id}: {solution_uid}")
+        
         # Determine if the solution is correct
         is_correct = final_answer and correct_answer and final_answer.strip().lower() == correct_answer.strip().lower()
+        print(f"  Solution correctness: {is_correct} (final_answer: '{final_answer}', correct_answer: '{correct_answer}')")
         
         # Combine text solution and PDF text if available
         full_solution_text = solution_text or ""
@@ -51,18 +54,28 @@ class GraphManager:
             if pdf_text:
                 full_solution_text += "\n\n" + pdf_text if full_solution_text else pdf_text
         
+        print(f"  Full solution text length: {len(full_solution_text)}")
+        print(f"  Solution text preview: {full_solution_text[:200]}{'...' if len(full_solution_text) > 200 else ''}")
+        
         if not full_solution_text.strip():
+            print(f"  ERROR: Empty solution text for {solution_uid}")
             return False
         
         # Add to graph
         graph = self.get_or_create_graph(assignment_id, problem_text)
+        print(f"  Adding to graph...")
         graph_success = graph.addSolution(solution_uid, full_solution_text, is_correct)
+        print(f"  Graph add result: {graph_success}")
         
         # Add to tree
         tree = self.get_or_create_tree(assignment_id, problem_text)
+        print(f"  Adding to tree...")
         tree_success = tree.addSolution(solution_uid, full_solution_text, is_correct)
+        print(f"  Tree add result: {tree_success}")
         
-        return graph_success and tree_success
+        success = graph_success and tree_success
+        print(f"  Overall success: {success}")
+        return success
     
     def generate_graph(self, assignment_id):
         """Generate graph data for the given assignment."""
