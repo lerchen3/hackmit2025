@@ -262,49 +262,109 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
                 
 class SolutionTree:
     class Node:
-        def __init__(self, step_text):
+        def pull_correctness(self):
+            self.is_correct=any(child.is_correct for child in self.children)
+
+        def __init__(self, step_text, creation_index):
             self.children = [] # Child
             self.parent = None
+            self.is_correct = False
+            self.creation_index = creation_index
             if step_text is not None:
                 self.parent_summary = step_text
-                self.parent_embed = api_manager.embedText(step_text)
 
     api_manager=APIManager("test_api_key")
     def __init__(self, problem_text, subject_domain="math"):
         self.problem_text = problem_text
         self.subject_domain = subject_domain
-        self.root = self.Node(None)
+        self.numNodes = 0
+        self.root = self.Node(None, self.numNodes)  # Root gets creation_index 0
+        self.numNodes += 1
     
     def generateTree(self):
-        return self.solution_graph.generateGraph()
+        edges = []  # List of tuples (parent_creation_index, child_creation_index)
+        node_summaries = [""] * self.numNodes  # Map creation_index -> node summary text
+        node_correctness = [False] * self.numNodes  # Map creation_index -> is_correct status
+        
+        def dfs(node):
+            if hasattr(node, 'parent_summary'):
+                node_summaries[node.creation_index] = node.parent_summary
+            else:
+                node_summaries[node.creation_index] = "Beginning of Solution"
+                
+            node_correctness[node.creation_index] = node.is_correct
+            
+            # Record edges to children
+            for child in node.children:
+                edges.append((node.creation_index, child.creation_index))
+                dfs(child)
+        
+        # Start DFS from root
+        dfs(self.root)
+        
+        return {
+            "edges": edges,
+            "node_summaries": node_summaries,
+            "node_correctness": node_correctness,
+            "total_nodes": self.numNodes
+        }
     
     def addSolution(self, solution_uid, solution_text, is_correct):
         cur_node = self.root
+        nodeList=[]
         while True:
+            nodeList.append(cur_node)
             # Find most similar child node
-            query_string="Match the following solution:\n"+solution_text+"\n\n"
-            query_string += "To the following list of next steps:\n"
-            for child in cur_node.children:
-                query_string += child.parent_summary+"\n"
+            res = -1
+            if len(cur_node.children) == 0:
+                cur_node.children.append(self.Node(solution_text,self.numNodes))
+                self.numNodes += 1
+                break
+            if len(cur_node.children) > 0:
+                query_string += "Here is the list of category next steps:\n"
+                for i in range(0,len(cur_node.children)):
+                    query_string += "Category "+str(i+1)+": \n"+cur_node.children[i].parent_summary+"\n"
 
-            SolutionTree.api_manager.query([{"role":"system","content":r"You are a helpful assistant who tries to find, out of a list of next steps, the one that most matches the user's solution. Respond with only the index of the most similar step."}])
-            
-            res = ;
+                query_string += "\n"
+                query_string="Match the following solution:\n"+solution_text+"\n\n"
+
+                response = SolutionTree.api_manager.query([{"role":"system","content":r"You are given a list of category next steps and a user's solution. Find the one that most matches the user's solution. Respond with only the index of the most similar category in the following format:\n ### [Index]"},{"role":"user","content":query_string}])
+                if response is None:
+                    print("Failed to receive response from API.")
+                    return False
+                res = response.split("###")[1].strip()
+                res = int(res)            
 
             shared=""
-            unshared=solution_text
-            if res != "No Matches Found":
-                response = SolutionTree.api_manager.query([{"role":}]) # Compute lca
-                shared,unshared=response.split("#####")
+            unshared1=cur_node.children[res].parent_summary
+            unshared2=solution_text
+            if res != -1:
+                response = SolutionTree.api_manager.query([{"role":"system","content":f"You are given two possibly incomplete solutions to a {self.subject_domain} problem. Find the largest prefix of steps that the two solutions have in common, verifying equal intermediate values. If there are no shared steps, simply respond with an empty string.Respond with the shared part and the unshared parts in the following format:\n ###\n [Shared Steps] ###\n [Unshared steps from first solution] ###\n [Unshared steps from second solution]"},{"role":"user","content":f"Solution 1:\n{cur_node.children[res].parent_summary}\nSolution 2:\n{solution_text}"}])
+                if response is None:
+                    print("die")
+                    return False
+                shared,unshared1,unshared2=response.split("###")[1:]
             shared = shared.strip()
-            unshared = unshared.strip()
+            unshared1 = unshared1.strip()
+            unshared2 = unshared2.strip()
             # Add new node
             if shared != "":
-                cur_node.children.append(self.Node(solution_text))
-                cur_node.children[-1],cur_node.children[sol_id] = cur_node.children[sol_id],cur_node.children[-1]
-                sol_id = len(cur_node.children)-1
-                intermediate_node = self.Node(shared)
-                intermediate_node.children.append(cur_node.children[sol_id])
-                intermediate_node.children.append(self.Node(unshared))
-            
-
+                cur_node.children.append(self.Node(shared,self.numNodes))
+                self.numNodes += 1
+                cur_node.children[-1].children.append(cur_node.children[res])
+                cur_node.children[res].parent_summary=unshared1
+                cur_node.children[-1],cur_node.children[res] = cur_node.children[res],cur_node.children[-1]
+                cur_node.children.pop()
+                cur_node=cur_node.children[res]
+            cur_node.children.append(self.Node(unshared2,self.numNodes))
+            self.numNodes += 1
+            cur_node=cur_node.children[-1]
+            solution_text=unshared2
+            if solution_text == "":
+                break
+        node_list.append(cur_node)
+        if cur_node.is_correct:
+            cur_node.is_correct=True
+            for node in reversed(nodeList):
+                node.pull_correctness()
+        return True
