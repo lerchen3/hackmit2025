@@ -801,6 +801,8 @@ class SolutionTree:
                     cur_node.children[-1].children.append(cur_node.children[res])
                     cur_node.children[res].parent_summary = unshared1
                     
+                    cur_node.children[-1].pull_correctness()
+                    
                     # Swap positions and remove the old reference
                     cur_node.children[-1], cur_node.children[res] = (
                         cur_node.children[res],
