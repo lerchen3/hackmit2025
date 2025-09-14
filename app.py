@@ -36,7 +36,7 @@ login_manager.login_view = 'login'
 
 # Initialize API manager for LLM operations
 try:
-    api_manager = APIManager("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")
+    api_manager = APIManager("bnxe")
 except Exception as e:
     print(f"Warning: Could not initialize API manager: {e}")
     api_manager = None
