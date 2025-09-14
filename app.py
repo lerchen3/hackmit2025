@@ -149,11 +149,12 @@ def teacher_dashboard():
         return redirect(url_for('student_dashboard'))
     
     assignments = Assignment.query.filter_by(created_by=current_user.id).all()
+    students = User.query.filter_by(is_teacher=False).all()
     
     # Calculate total solutions for all assignments
     total_solutions = sum(len(assignment.solutions) for assignment in assignments)
     
-    return render_template('teacher_dashboard.html', assignments=assignments, total_solutions=total_solutions)
+    return render_template('teacher_dashboard.html', assignments=assignments, students=students, total_solutions=total_solutions)
 
 @app.route('/student/dashboard')
 @login_required
@@ -210,6 +211,42 @@ def create_assignment():
         return redirect(url_for('teacher_dashboard'))
     
     return render_template('create_assignment.html')
+
+@app.route('/teacher/students/create', methods=['GET', 'POST'])
+@login_required
+def create_student():
+    if not current_user.is_teacher:
+        flash('Access denied', 'error')
+        return redirect(url_for('student_dashboard'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form.get('password', '')  # Optional password for students
+        
+        # Check if username already exists
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            flash('Username already exists', 'error')
+            return render_template('create_student.html')
+        
+        # Create new student account
+        new_student = User(
+            username=username,
+            password_hash=generate_password_hash(password) if password else None,
+            is_teacher=False
+        )
+        
+        try:
+            db.session.add(new_student)
+            db.session.commit()
+            flash(f'Student account "{username}" created successfully!', 'success')
+            return redirect(url_for('teacher_dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash('Error creating student account', 'error')
+            return render_template('create_student.html')
+    
+    return render_template('create_student.html')
 
 @app.route('/student/assignment/<int:assignment_id>')
 @login_required
@@ -382,6 +419,91 @@ def submit_bulk_feedback():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': 'Failed to submit feedback'}), 500
+
+@app.route('/teacher/assignment/<int:assignment_id>/submit-solutions', methods=['GET', 'POST'])
+@login_required
+def submit_solutions_for_students(assignment_id):
+    if not current_user.is_teacher:
+        flash('Access denied', 'error')
+        return redirect(url_for('student_dashboard'))
+    
+    assignment = Assignment.query.get_or_404(assignment_id)
+    students = User.query.filter_by(is_teacher=False).all()
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            solutions_data = request.form.get('solutions_data')
+            if not solutions_data:
+                flash('No solution data provided', 'error')
+                return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
+            
+            import json
+            solutions = json.loads(solutions_data)
+            
+            # Process each solution
+            created_solutions = []
+            for solution_data in solutions:
+                student_id = solution_data.get('student_id')
+                solution_text = solution_data.get('solution_text', '')
+                final_answer = solution_data.get('final_answer', '')
+                
+                if not student_id or (not solution_text and not final_answer):
+                    continue
+                
+                # Check if solution already exists for this student
+                existing_solution = Solution.query.filter_by(
+                    assignment_id=assignment_id,
+                    student_id=student_id
+                ).first()
+                
+                if existing_solution:
+                    # Update existing solution
+                    existing_solution.solution_text = solution_text
+                    existing_solution.final_answer = final_answer
+                    existing_solution.submitted_at = datetime.utcnow()
+                    created_solutions.append(existing_solution)
+                else:
+                    # Create new solution
+                    solution = Solution(
+                        assignment_id=assignment_id,
+                        student_id=student_id,
+                        solution_text=solution_text,
+                        final_answer=final_answer
+                    )
+                    db.session.add(solution)
+                    created_solutions.append(solution)
+            
+            db.session.commit()
+            
+            # Process solutions with graph manager
+            for solution in created_solutions:
+                try:
+                    solution_uid = f"{solution.student.username}_{solution.id}"
+                    problem_text = assignment.description_text or ""
+                    graph_manager.process_solution(
+                        assignment_id=assignment_id,
+                        solution_uid=solution_uid,
+                        solution_text=solution.solution_text,
+                        solution_file_path=None,
+                        final_answer=solution.final_answer,
+                        correct_answer=assignment.correct_answer,
+                        problem_text=problem_text
+                    )
+                except Exception as e:
+                    print(f"Error processing solution with graph manager: {e}")
+                    # Don't fail the submission if graph processing fails
+            
+            flash(f'Successfully submitted {len(created_solutions)} solution(s) for students!', 'success')
+            return redirect(url_for('view_solutions', assignment_id=assignment_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash('Error submitting solutions. Please try again.', 'error')
+            return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
+    
+    return render_template('submit_solutions_for_students.html', assignment=assignment, students=students)
+
 
 @app.route('/uploads/assignments/<filename>')
 def uploaded_assignment_file(filename):

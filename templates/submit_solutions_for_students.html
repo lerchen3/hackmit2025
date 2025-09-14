@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Solutions for Students - {{ assignment.title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
+                <i class="fas fa-users text-primary mr-3"></i>Submit Solutions for Students
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">Provide solutions on behalf of all students for: {{ assignment.title }}</p>
+        </div>
+        <div class="flex space-x-3">
+            <a href="{{ url_for('view_solutions', assignment_id=assignment.id) }}" 
+               class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                <i class="fas fa-arrow-left mr-2"></i>Back to Solutions
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Solutions Form -->
+        <div class="lg:col-span-3">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-edit text-primary mr-2"></i>Student Solutions
+                    </h3>
+                    
+                    <form method="POST" id="solutions-form">
+                        <input type="hidden" id="solutions-data" name="solutions_data">
+                        
+                        <div class="space-y-6" id="students-container">
+                            {% for student in students %}
+                            <div class="border border-gray-200 rounded-lg p-4 student-solution-card" data-student-id="{{ student.id }}">
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-user text-gray-400 mr-2"></i>
+                                        <span class="text-lg font-medium text-gray-900">{{ student.username }}</span>
+                                    </div>
+                                    <div class="flex items-center space-x-2">
+                                        <label class="flex items-center">
+                                            <input type="checkbox" 
+                                                   class="student-checkbox h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" 
+                                                   data-student-id="{{ student.id }}">
+                                            <span class="ml-2 text-sm text-gray-600">Include this student</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <!-- Solution Text -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            <i class="fas fa-file-alt text-primary mr-1"></i>Solution Text
+                                        </label>
+                                        <textarea class="solution-text w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary" 
+                                                  rows="6" 
+                                                  data-student-id="{{ student.id }}"
+                                                  placeholder="Enter solution text for {{ student.username }}..."></textarea>
+                                    </div>
+                                    
+                                    <!-- Final Answer -->
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                                            <i class="fas fa-check-circle text-primary mr-1"></i>Final Answer
+                                        </label>
+                                        <input type="text" 
+                                               class="final-answer w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                                               data-student-id="{{ student.id }}"
+                                               placeholder="Enter final answer for {{ student.username }}...">
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <div class="mt-8 flex justify-end space-x-3">
+                            <a href="{{ url_for('view_solutions', assignment_id=assignment.id) }}" 
+                               class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                                Cancel
+                            </a>
+                            <button type="submit" 
+                                    id="submit-btn"
+                                    class="px-4 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                <i class="fas fa-save mr-2"></i>Submit All Solutions
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Assignment Details Sidebar -->
+        <div class="space-y-6">
+            <!-- Assignment Info -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-info-circle text-primary mr-2"></i>Assignment Details
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="text-md font-medium text-gray-900">{{ assignment.title }}</h4>
+                            <p class="text-sm text-gray-500">
+                                Created: {{ assignment.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                            </p>
+                        </div>
+                        
+                        {% if assignment.description_text %}
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900 mb-2">Description:</h5>
+                            <div class="text-sm text-gray-700 latex-content" id="assignment-description-{{ assignment.id }}">{{ assignment.description_text }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if assignment.description_image %}
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900 mb-2">Description Image:</h5>
+                            <img src="{{ url_for('uploaded_assignment_file', filename=assignment.description_image) }}" 
+                                 class="w-full rounded-lg" alt="Assignment description">
+                        </div>
+                        {% endif %}
+                        
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900 mb-2">Correct Answer:</h5>
+                            <div class="text-sm text-gray-700 latex-content" id="correct-answer-{{ assignment.id }}">{{ assignment.correct_answer }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Students Summary -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-users text-primary mr-2"></i>Students Summary
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-sm font-medium text-gray-500">Total Students:</span>
+                            <span class="text-sm text-gray-900">{{ students|length }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm font-medium text-gray-500">Selected:</span>
+                            <span class="text-sm text-gray-900" id="selected-count">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm font-medium text-gray-500">With Solutions:</span>
+                            <span class="text-sm text-gray-900" id="solutions-count">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Help Section -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                        <i class="fas fa-question-circle text-primary mr-2"></i>Bulk Submission Guide
+                    </h3>
+                    <div class="space-y-3 text-sm text-gray-600">
+                        <div class="flex items-start">
+                            <i class="fas fa-check-square text-green-500 mr-2 mt-1"></i>
+                            <p>Check the boxes for students you want to submit solutions for.</p>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-edit text-blue-500 mr-2 mt-1"></i>
+                            <p>Provide solution text and final answers for each selected student.</p>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-save text-purple-500 mr-2 mt-1"></i>
+                            <p>Click "Submit All Solutions" to save all solutions at once.</p>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-chart-line text-orange-500 mr-2 mt-1"></i>
+                            <p>Solutions will be processed and included in the solution graph analysis.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global variables
+let selectedStudents = new Set();
+let solutionsData = {};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    updateCounts();
+    
+    // Add event listeners
+    document.querySelectorAll('.student-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', handleStudentToggle);
+    });
+    
+    document.querySelectorAll('.solution-text, .final-answer').forEach(input => {
+        input.addEventListener('input', handleSolutionChange);
+    });
+    
+    // Form submission
+    document.getElementById('solutions-form').addEventListener('submit', handleFormSubmit);
+});
+
+function handleStudentToggle(event) {
+    const studentId = event.target.dataset.studentId;
+    const card = event.target.closest('.student-solution-card');
+    
+    if (event.target.checked) {
+        selectedStudents.add(studentId);
+        card.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50');
+    } else {
+        selectedStudents.delete(studentId);
+        card.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50');
+    }
+    
+    updateCounts();
+}
+
+function handleSolutionChange(event) {
+    const studentId = event.target.dataset.studentId;
+    const field = event.target.classList.contains('solution-text') ? 'solution_text' : 'final_answer';
+    
+    if (!solutionsData[studentId]) {
+        solutionsData[studentId] = {};
+    }
+    
+    solutionsData[studentId][field] = event.target.value;
+    updateCounts();
+}
+
+function updateCounts() {
+    const selectedCount = selectedStudents.size;
+    const solutionsCount = Object.keys(solutionsData).filter(id => {
+        const data = solutionsData[id];
+        return data && (data.solution_text || data.final_answer);
+    }).length;
+    
+    document.getElementById('selected-count').textContent = selectedCount;
+    document.getElementById('solutions-count').textContent = solutionsCount;
+    
+    // Update submit button state
+    const submitBtn = document.getElementById('submit-btn');
+    if (selectedCount === 0 || solutionsCount === 0) {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    // Collect data for selected students only
+    const solutions = [];
+    
+    selectedStudents.forEach(studentId => {
+        const data = solutionsData[studentId];
+        if (data && (data.solution_text || data.final_answer)) {
+            solutions.push({
+                student_id: parseInt(studentId),
+                solution_text: data.solution_text || '',
+                final_answer: data.final_answer || ''
+            });
+        }
+    });
+    
+    if (solutions.length === 0) {
+        alert('Please select at least one student and provide solution data.');
+        return;
+    }
+    
+    // Set the hidden input
+    document.getElementById('solutions-data').value = JSON.stringify(solutions);
+    
+    // Show loading state
+    const submitBtn = document.getElementById('submit-btn');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
+    submitBtn.disabled = true;
+    
+    // Submit the form
+    event.target.submit();
+}
+
+// Auto-resize textareas
+document.querySelectorAll('.solution-text').forEach(textarea => {
+    textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+    });
+    
+    // Initialize height
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+});
+</script>
+{% endblock %}

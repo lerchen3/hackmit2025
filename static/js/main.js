@@ -476,24 +476,51 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             this.tooltipTimeout = setTimeout(() => {
                 const tooltipGroup = d3.select(this.parentNode).select('.tooltip-group');
                 
-                // Get text dimensions for proper sizing
-                const tooltipText = tooltipGroup.select('.tooltip-text');
-                const textNode = tooltipText.node();
-                const bbox = textNode.getBBox();
-                const padding = 8;
+                // Create HTML tooltip for LaTeX support
+                const nodeData = d3.select(this.parentNode).datum();
+                const tooltipId = `tooltip-${nodeData.id}`;
                 
-                // Update background size based on text
-                tooltipGroup.select('.tooltip-bg')
-                    .attr('x', -bbox.width/2 - padding)
-                    .attr('y', -bbox.height/2 - padding)
-                    .attr('width', bbox.width + (padding * 2))
-                    .attr('height', bbox.height + (padding * 2));
+                // Remove existing HTML tooltip if it exists
+                d3.select(`#${tooltipId}`).remove();
                 
-                // Show the tooltip
-                tooltipGroup
+                // Create HTML tooltip
+                const htmlTooltip = d3.select('body')
+                    .append('div')
+                    .attr('id', tooltipId)
+                    .attr('class', 'graph-tooltip')
+                    .style('position', 'absolute')
+                    .style('background', '#333')
+                    .style('color', 'white')
+                    .style('padding', '8px 12px')
+                    .style('border-radius', '8px')
+                    .style('font-size', '11px')
+                    .style('font-weight', '500')
+                    .style('max-width', '300px')
+                    .style('z-index', '1000')
+                    .style('pointer-events', 'none')
+                    .style('opacity', '0')
+                    .style('transition', 'opacity 0.2s')
+                    .html(`<div class="latex-content">${nodeData.label}</div>`);
+                
+                // Position the tooltip
+                const nodeRect = this.parentNode.getBoundingClientRect();
+                const tooltipRect = htmlTooltip.node().getBoundingClientRect();
+                const x = nodeRect.left + (nodeRect.width / 2) - (tooltipRect.width / 2);
+                const y = nodeRect.top - tooltipRect.height - 10;
+                
+                htmlTooltip
+                    .style('left', `${x}px`)
+                    .style('top', `${y}px`)
                     .transition()
                     .duration(200)
-                    .attr('opacity', 1);
+                    .style('opacity', '1');
+                
+                // Render LaTeX in the tooltip
+                if (window.MathJax) {
+                    window.MathJax.typesetPromise([htmlTooltip.node()]).catch(function (err) {
+                        console.log('MathJax tooltip rendering error:', err);
+                    });
+                }
                 
                 // Slightly enlarge the visible circle
                 d3.select(this.parentNode).select('circle')
@@ -508,12 +535,10 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 clearTimeout(this.tooltipTimeout);
             }
             
-            // Hide tooltip bubble
-            const tooltipGroup = d3.select(this.parentNode).select('.tooltip-group');
-            tooltipGroup
-                .transition()
-                .duration(200)
-                .attr('opacity', 0);
+            // Remove HTML tooltip
+            const nodeData = d3.select(this.parentNode).datum();
+            const tooltipId = `tooltip-${nodeData.id}`;
+            d3.select(`#${tooltipId}`).remove();
             
             // Return circle to normal size
             d3.select(this.parentNode).select('circle')
@@ -532,26 +557,51 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             
             // Show tooltip after a small delay to prevent flickering
             this.tooltipTimeout = setTimeout(() => {
-                const tooltipGroup = d3.select(this).select('.tooltip-group');
+                // Create HTML tooltip for LaTeX support
+                const nodeData = d3.select(this).datum();
+                const tooltipId = `tooltip-${nodeData.id}`;
                 
-                // Get text dimensions for proper sizing
-                const tooltipText = tooltipGroup.select('.tooltip-text');
-                const textNode = tooltipText.node();
-                const bbox = textNode.getBBox();
-                const padding = 8;
+                // Remove existing HTML tooltip if it exists
+                d3.select(`#${tooltipId}`).remove();
                 
-                // Update background size based on text
-                tooltipGroup.select('.tooltip-bg')
-                    .attr('x', -bbox.width/2 - padding)
-                    .attr('y', -bbox.height/2 - padding)
-                    .attr('width', bbox.width + (padding * 2))
-                    .attr('height', bbox.height + (padding * 2));
+                // Create HTML tooltip
+                const htmlTooltip = d3.select('body')
+                    .append('div')
+                    .attr('id', tooltipId)
+                    .attr('class', 'graph-tooltip')
+                    .style('position', 'absolute')
+                    .style('background', '#333')
+                    .style('color', 'white')
+                    .style('padding', '8px 12px')
+                    .style('border-radius', '8px')
+                    .style('font-size', '11px')
+                    .style('font-weight', '500')
+                    .style('max-width', '300px')
+                    .style('z-index', '1000')
+                    .style('pointer-events', 'none')
+                    .style('opacity', '0')
+                    .style('transition', 'opacity 0.2s')
+                    .html(`<div class="latex-content">${nodeData.label}</div>`);
                 
-                // Show the tooltip
-                tooltipGroup
+                // Position the tooltip
+                const nodeRect = this.getBoundingClientRect();
+                const tooltipRect = htmlTooltip.node().getBoundingClientRect();
+                const x = nodeRect.left + (nodeRect.width / 2) - (tooltipRect.width / 2);
+                const y = nodeRect.top - tooltipRect.height - 10;
+                
+                htmlTooltip
+                    .style('left', `${x}px`)
+                    .style('top', `${y}px`)
                     .transition()
                     .duration(200)
-                    .attr('opacity', 1);
+                    .style('opacity', '1');
+                
+                // Render LaTeX in the tooltip
+                if (window.MathJax) {
+                    window.MathJax.typesetPromise([htmlTooltip.node()]).catch(function (err) {
+                        console.log('MathJax tooltip rendering error:', err);
+                    });
+                }
                 
                 // Slightly enlarge the visible circle
                 d3.select(this).select('circle')
@@ -566,12 +616,10 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 clearTimeout(this.tooltipTimeout);
             }
             
-            // Hide tooltip bubble
-            const tooltipGroup = d3.select(this).select('.tooltip-group');
-            tooltipGroup
-                .transition()
-                .duration(200)
-                .attr('opacity', 0);
+            // Remove HTML tooltip
+            const nodeData = d3.select(this).datum();
+            const tooltipId = `tooltip-${nodeData.id}`;
+            d3.select(`#${tooltipId}`).remove();
             
             // Return circle to normal size
             d3.select(this).select('circle')
@@ -610,7 +658,7 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         .attr('width', 100)
         .attr('height', 30);
 
-    // Add tooltip text
+    // Add tooltip text container (will be replaced with HTML for LaTeX support)
     tooltipGroups.append('text')
         .attr('class', 'tooltip-text')
         .attr('text-anchor', 'middle')
@@ -705,6 +753,9 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             .transition()
             .duration(200)
             .attr('opacity', 0);
+        
+        // Remove all HTML tooltips
+        d3.selectAll('.graph-tooltip').remove();
         
         // If no submission UID provided, just reset and return
         if (!submissionUid) {

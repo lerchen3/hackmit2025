@@ -232,7 +232,7 @@ Reasoning: ...
                 if not found_prev:
                     step_graph.append((0,int(solution[j])))  # Convert to Python int
                 if not found_next:
-                    step_graph.append((int(solution[j]),n-1))  # Convert to Python int
+                    step_graph.append((int(solution[j]),1))  # Convert to Python int
 
         # Perform error marking
         step_is_correct = [False for i in range(0,n)]
@@ -245,7 +245,7 @@ Reasoning: ...
         for uid, idx in self.solution_uid_to_index.items():
             submissions.append({
                 "submission_uid": uid,
-                "submission_nodes": [0] + [int(x) for x in self.solutions[idx]] + [n-1]  # Ensure all values are Python int
+                "submission_nodes": [0] + [int(x) for x in self.solutions[idx]] + [1]  # Ensure all values are Python int
             })
         
         return {
@@ -331,7 +331,7 @@ class SolutionTree:
         edges = []  # List of tuples (parent_creation_index, child_creation_index)
         node_summaries = [""] * self.numNodes  # Map creation_index -> node summary text
         node_correctness = [False] * self.numNodes  # Map creation_index -> is_correct status
-        submissions = [{} for i in range(0,self.numNodes)]
+        submissions = [{} for i in range(self.sol_count)]
         stack=[]
         def dfs(node):
             stack.append(node.creation_index)
@@ -376,14 +376,14 @@ class SolutionTree:
                 self.numNodes += 1
                 break
             if len(cur_node.children) > 0:
-                query_string = "Here is the list of categories of possible next steps:\n"
+                query_string = "Here is the numbered list of possible first steps:\n"
                 for i in range(0,len(cur_node.children)):
                     query_string += "Category "+str(i+1)+": \n"+cur_node.children[i].parent_summary+"\n"
 
                 query_string += "\n"
-                query_string += "Match the following solution to one of the categories:\n"+solution_text+"\n\n"
+                query_string += "Match the following solution to one of the first steps:\n"+solution_text+"\n\n"
 
-                response = SolutionTree.api_manager.query([{"role":"system","content":r"You are given a list of category next steps and a user's solution. Find the one that most matches the user's solution. Respond with only the index of the most similar category in the following format:\n ### [Index]"},{"role":"user","content":query_string}])
+                response = SolutionTree.api_manager.query([{"role":"system","content":r"You will be provided 1) A numbered list of possible first steps to a math problem and 2) A solution to that math problem. Task: Find the first step that best matches the user's solution. Do not think too hard. Respond with only the number of the best match in the following format:\n ### [Index]"},{"role":"user","content":query_string}])
                 if response is None:
                     print("Failed to receive response from API.")
                     return False
@@ -404,15 +404,21 @@ class SolutionTree:
             unshared1=cur_node.children[res].parent_summary
             unshared2=solution_text
             if res != -1:
-                response = SolutionTree.api_manager.query([{"role":"system","content":f"You are given two possibly incomplete solutions to a {self.subject_domain} problem. Find the largest prefix of steps that the two solutions have in common, verifying equal intermediate values. If there are no shared steps, simply respond with an empty string. Respond with the shared part and the unshared parts in the following format:\n ###\n [Shared Steps] ###\n [Unshared steps from first solution] ###\n [Unshared steps from second solution]"},{"role":"user","content":f"Solution 1:\n{cur_node.children[res].parent_summary}\nSolution 2:\n{solution_text}"}])
-                if response is None:
+                shared=self.api_manager.query([{"role":"system","content":f"You will be given two solutions to a math problem. Task: Find the largest prefix of steps shared by both solutions, verifying equal intermediate values. Respond with only the shared prefix."},
+{"role":"user","content":f"Solution 1:\n{cur_node.children[res].parent_summary}\nSolution 2:\n{solution_text}"}])
+                if shared is None:
                     print("die")
                     return False
-                parts = response.split("###")
-                if len(parts)<4:
-                    print("Invalid response format from API.")
+                unshared1=self.api_manager.query([{"role":"system","content":f"You will be given a solution to a math problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string."},
+{"role":"user","content":f"Full Solution:\n{cur_node.children[res].parent_summary}\nIncomplete Prefix:\n{shared}"}])
+                if unshared1 is None:
+                    print("die")
                     return False
-                shared,unshared1,unshared2=parts[1:]
+                unshared2=self.api_manager.query([{"role":"system","content":f"You will be given a solution to a math problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string."},
+{"role":"user","content":f"Full Solution:\n{solution_text}\nIncomplete Prefix:\n{shared}"}])
+                if unshared2 is None:
+                    print("die")
+                    return False
             shared = shared.strip()
             unshared1 = unshared1.strip()
             unshared2 = unshared2.strip()
