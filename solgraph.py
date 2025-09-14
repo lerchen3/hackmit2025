@@ -26,7 +26,20 @@ class SolutionGraph:
         return [{"role":"system","content":f"You are a helpful assistant who concisely and without unnecessary details summarizes the key ideas of the following step of a solution to a {self.subject_domain} problem."},{"role":"user","content":f"The step is as follows:\n{step}"}]
 
     def formatVerificationQuery(self,step1,step2):
-        return [{"role":"system","content":f"You are a helpful assistant who checks whether the key ideas of certain texts are the exact same. Respond with a Yes or No."},{"role":"user","content":f"Both texts are steps of a solution to a {self.subject_domain} problem. The first text is as follows:\n{step1} The second text is as follows:\n{step2} Are they functionally the same?"}]
+        return [
+            {
+                "role": "system",
+                "content": f"""Fundamentally, are these two steps of two different solutions to a {self.subject_domain} problem the same? They need to use the all of the exact same ideas, the same technique, and the same means of execution.
+
+Don't overthink it! It should be obvious whether or not they're doing the same thing or not: Okay reasons are, say, \"Solution 1 uses length XY while solution 2 does not; no.\"
+
+Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too much or analyzing the solutions too much."""
+            },
+            {
+                "role": "user",
+                "content": f"Solution 1:\n{step1}\n\nSolution 2:\n{step2}\n\nAnswer with yes or no only."
+            }
+        ]
 
     def formatSolutionDedupeQuery(self, sol1, sol2):
         return [
@@ -98,7 +111,7 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
         if summary is None:
             return None
         self.stepSummary.append(summary.strip())
-        return self.index.ntotal-1
+        return len(self.stepSummary)-1
 
     def addSolution(self, solution_uid,solution_text,is_correct):
         # Solution-level dedupe first
@@ -109,12 +122,34 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
                 self.solution_is_correct[dup_idx] = True
             return True
 
-        response = self.api_manager.query([{"role": "system", "content": f"You are a helpful assistant who can break down solutions to mathematics problems into smaller steps."}, 
-                                    {"role": "user", "content": f"One of my students was trying to solve the following problem:\n" 
-                                                                f"{self.problem_text}\n"
-                                                                f"Their solution may have errors or be incomplete. "
-                                                                f"Could you organize the solution into individual major steps in a way that highlights key ideas and formulas? Each step should begin with ###, followed by the step number and a short description, and include no other formatting. The solution is as follows:\n"
-                                                                f"{solution_text}"}])
+        response = self.api_manager.query([
+    {"role": "system", "content": 
+r'''You are a solution explainer.
+
+Your task is to take a complete solution and reformat it into large, structured steps. Steps should be split before statements that change the course of the solution or require deep insight and a new idea.
+Do not add new reasoning or solve the problem yourself — just restructure what is already there.  
+
+For each step:  
+- Give a short **title** (what technique/formula/idea is applied).  
+- If applicable, show the **general formula or theorem**.  
+- Summarize the **reasoning/work** for that step.  
+- Do not create extra steps for trivial algebra, computation, or obvious logical steps.  
+- Use inline LaTeX only. Do not use block LaTeX.
+
+At the end, include the **final result**.
+
+Format it like this:
+
+### Step 1. [Technique / Formula Name]
+Formula: ...  
+Reasoning: ...
+
+### Step 2. [Technique / Formula Name]
+Formula: ...  
+Reasoning: ...
+
+...
+'''}, {"role": "user", "content": solution_text}])
 
         if response is None:
             print("Failed to receive step breakdown from API.")
@@ -161,7 +196,7 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
     '''
     def generateGraph(self):
         graph = [[] for i in range(0,len(self.stepSummary))]
-        inDegree = [0 for i in range(0,len(self.stepSummary))]
+        inDegree = [0] * len(self.stepSummary)
         submissions = []
         n = len(self.stepSummary)
         
@@ -210,7 +245,7 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
         for uid, idx in self.solution_uid_to_index.items():
             submissions.append({
                 "submission_uid": uid,
-                "submission_nodes": self.solutions[idx]
+                "submission_nodes": [0] + self.solutions[idx] + [1]
             })
         
         return {
@@ -278,6 +313,7 @@ class SolutionTree:
             self.parent = None
             self.is_correct = False
             self.creation_index = creation_index
+            self.terminal=[]
             if step_text is not None:
                 self.parent_summary = step_text
 
@@ -286,37 +322,41 @@ class SolutionTree:
         self.problem_text = problem_text
         self.subject_domain = subject_domain
         self.numNodes = 0
-        self.root = self.Node(None, self.numNodes)  # Root gets creation_index 0
+        self.root = self.Node("Read the problem", self.numNodes)  # Root gets creation_index 0
         self.numNodes += 1
         self.solution_uid_to_index={}
-        self.solutions=[]
+        self.sol_count=0
     
     def generateTree(self):
         edges = []  # List of tuples (parent_creation_index, child_creation_index)
         node_summaries = [""] * self.numNodes  # Map creation_index -> node summary text
         node_correctness = [False] * self.numNodes  # Map creation_index -> is_correct status
-        
+        submissions = [{} for i in range(0,self.numNodes)]
+        stack=[]
         def dfs(node):
+            stack.append(node.creation_index)
             if hasattr(node, 'parent_summary'):
                 node_summaries[node.creation_index] = node.parent_summary
             else:
                 node_summaries[node.creation_index] = "Beginning of Solution"
                 
             node_correctness[node.creation_index] = node.is_correct
-            
+
+            # Record terminal nodes for this path
+            if hasattr(node, 'terminal') and node.terminal:
+                for sol_idx in node.terminal:
+                    submissions[sol_idx]["submission_nodes"] = stack.copy()
+
             # Record edges to children
             for child in node.children:
                 edges.append((node.creation_index, child.creation_index))
                 dfs(child)
+            stack.pop()
         
         # Start DFS from root
         dfs(self.root)
-        submissions = []
         for uid, idx in self.solution_uid_to_index.items():
-            submissions.append({
-                "submission_uid": uid,
-                "submission_nodes": self.solutions[idx]
-            })
+            submissions[idx]["submission_uid"]=uid
         return {
             "edges": edges,
             "node_summaries": node_summaries,
@@ -325,7 +365,6 @@ class SolutionTree:
         }
     
     def addSolution(self, solution_uid, solution_text, is_correct):
-        self.solution_uid_to_index[solution_uid] = len(self.solutions)
         cur_node = self.root
         nodeList=[]
         while True:
@@ -337,19 +376,29 @@ class SolutionTree:
                 self.numNodes += 1
                 break
             if len(cur_node.children) > 0:
-                query_string = "Here is the list of category next steps:\n"
+                query_string = "Here is the list of categories of possible next steps:\n"
                 for i in range(0,len(cur_node.children)):
                     query_string += "Category "+str(i+1)+": \n"+cur_node.children[i].parent_summary+"\n"
 
                 query_string += "\n"
-                query_string += "Match the following solution:\n"+solution_text+"\n\n"
+                query_string += "Match the following solution to one of the categories:\n"+solution_text+"\n\n"
 
                 response = SolutionTree.api_manager.query([{"role":"system","content":r"You are given a list of category next steps and a user's solution. Find the one that most matches the user's solution. Respond with only the index of the most similar category in the following format:\n ### [Index]"},{"role":"user","content":query_string}])
                 if response is None:
                     print("Failed to receive response from API.")
                     return False
-                res = response.split("###")[1].strip()
-                res = int(res)            
+                 try:
+                     parts = response.split("###")
+                     if len(parts) < 2:
+                         print("Invalid response format from API.")
+                         return False
+                     res = int(parts[1].strip()) - 1  # Convert to 0-based indexing
+                     if res < 0 or res >= len(cur_node.children):
+                         print(f"Invalid index {res+1} from API response. Must be between 1 and {len(cur_node.children)}.")
+                         return False
+                 except (ValueError, IndexError) as e:
+                     print(f"Error parsing API response: {e}")
+                     return False
 
             shared=""
             unshared1=cur_node.children[res].parent_summary
@@ -359,29 +408,39 @@ class SolutionTree:
                 if response is None:
                     print("die")
                     return False
-                shared,unshared1,unshared2=response.split("###")[1:]
+                parts = response.split("###")
+                if len(parts)<4:
+                    print("Invalid response format from API.")
+                    return False
+                shared,unshared1,unshared2=parts[1:]
             shared = shared.strip()
             unshared1 = unshared1.strip()
             unshared2 = unshared2.strip()
             # Add new node
-            if shared != "":
-                cur_node.children.append(self.Node(shared,self.numNodes))
+            if unshared1 != "":
+                if shared != "":
+                    cur_node.children.append(self.Node(shared,self.numNodes))
+                    self.numNodes += 1
+                    cur_node.children[-1].children.append(cur_node.children[res])
+                    cur_node.children[res].parent_summary=unshared1
+                    cur_node.children[-1],cur_node.children[res] = cur_node.children[res],cur_node.children[-1]
+                    cur_node.children.pop()
+                    cur_node=cur_node.children[res]
+                cur_node.children.append(self.Node(unshared2,self.numNodes))
                 self.numNodes += 1
-                cur_node.children[-1].children.append(cur_node.children[res])
-                cur_node.children[res].parent_summary=unshared1
-                cur_node.children[-1],cur_node.children[res] = cur_node.children[res],cur_node.children[-1]
-                cur_node.children.pop()
+                cur_node=cur_node.children[-1]
+                break
+            else:
+                solution_text=unshared2
                 cur_node=cur_node.children[res]
-            cur_node.children.append(self.Node(unshared2,self.numNodes))
-            self.numNodes += 1
-            cur_node=cur_node.children[-1]
-            solution_text=unshared2
             if solution_text == "":
                 break
         nodeList.append(cur_node)
+        cur_node.terminal.append(self.sol_count)
+        self.solution_uid_to_index[solution_uid] = self.sol_count
         if is_correct:
             cur_node.is_correct=True
             for node in reversed(nodeList):
                 node.pull_correctness()
-        self.solutions.append(nodeList)
+        self.sol_count+=1
         return True
