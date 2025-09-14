@@ -9,6 +9,7 @@ import csv
 import io
 import json
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
 import csv
 import time
 from graph_manager import graph_manager
@@ -36,10 +37,14 @@ login_manager.login_view = 'login'
 
 # Initialize API manager for LLM operations
 try:
-    api_manager = APIManager("bnxe")
+    api_manager = APIManager("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")
 except Exception as e:
     print(f"Warning: Could not initialize API manager: {e}")
     api_manager = None
+# Thread pool for background solution processing
+EXECUTOR_MAX_WORKERS = int(os.getenv('GRAPH_EXECUTOR_WORKERS', '8'))
+graph_executor = ThreadPoolExecutor(max_workers=EXECUTOR_MAX_WORKERS)
+
 
 # Database Models
 class User(UserMixin, db.Model):
@@ -314,28 +319,35 @@ def submit_solution(assignment_id):
     
     db.session.commit()
     
-    # Process solution with graph manager
+    # Process solution with graph manager asynchronously
     try:
         assignment = Assignment.query.get(assignment_id)
         if assignment:
+            # Pre-create graph/tree to avoid race on first access
+            problem_text = assignment.description_text or ""
+            try:
+                graph_manager.get_or_create_graph(assignment_id, problem_text)
+                graph_manager.get_or_create_tree(assignment_id, problem_text)
+            except Exception:
+                pass
+
             solution_file_path = None
             if solution_file:
                 solution_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'solutions', solution_file)
-            
+
             solution_uid = f"{current_user.username}_{solution.id}"
-            problem_text = assignment.description_text or ""
-            graph_manager.process_solution(
-                assignment_id=assignment_id,
-                solution_uid=solution_uid,
-                solution_text=solution_text,
-                solution_file_path=solution_file_path,
-                final_answer=final_answer,
-                correct_answer=assignment.correct_answer,
-                problem_text=problem_text
+            graph_executor.submit(
+                graph_manager.process_solution,
+                assignment_id,
+                solution_uid,
+                solution_text,
+                solution_file_path,
+                final_answer,
+                assignment.correct_answer,
+                problem_text,
             )
     except Exception as e:
-        print(f"Error processing solution with graph manager: {e}")
-        # Don't fail the submission if graph processing fails
+        print(f"Error scheduling solution processing: {e}")
     
     flash('Solution submitted successfully!', 'success')
     return redirect(url_for('view_assignment', assignment_id=assignment_id))
@@ -662,8 +674,7 @@ def submit_solutions_for_students(assignment_id):
                         db.session.commit()
                         created_solutions.append(solution)
 
-                    # 10ms delay between rows to simulate staggered submissions
-                    time.sleep(0.01)
+                    # Removed artificial delay; processing happens asynchronously below
 
             else:
                 # JSON form field path (existing behavior)
@@ -704,26 +715,36 @@ def submit_solutions_for_students(assignment_id):
                         db.session.commit()
                         created_solutions.append(solution)
             
-            # Process solutions with graph manager
-            for solution in created_solutions:
+            # Process solutions with graph manager asynchronously
+            try:
+                # Pre-create graph/tree to avoid race on first access
+                problem_text = assignment.description_text or ""
                 try:
-                    # Ensure relationship for username
-                    if not getattr(solution, 'student', None):
-                        solution.student = User.query.get(solution.student_id)
-                    solution_uid = f"{solution.student.username}_{solution.id}"
-                    problem_text = assignment.description_text or ""
-                    graph_manager.process_solution(
-                        assignment_id=assignment_id,
-                        solution_uid=solution_uid,
-                        solution_text=solution.solution_text,
-                        solution_file_path=None,
-                        final_answer=solution.final_answer,
-                        correct_answer=assignment.correct_answer,
-                        problem_text=problem_text
-                    )
-                except Exception as e:
-                    print(f"Error processing solution with graph manager: {e}")
-                    # Don't fail the submission if graph processing fails
+                    graph_manager.get_or_create_graph(assignment_id, problem_text)
+                    graph_manager.get_or_create_tree(assignment_id, problem_text)
+                except Exception:
+                    pass
+
+                for solution in created_solutions:
+                    try:
+                        if not getattr(solution, 'student', None):
+                            solution.student = User.query.get(solution.student_id)
+                        solution_uid = f"{solution.student.username}_{solution.id}"
+                        graph_executor.submit(
+                            graph_manager.process_solution,
+                            assignment_id,
+                            solution_uid,
+                            solution.solution_text,
+                            None,
+                            solution.final_answer,
+                            assignment.correct_answer,
+                            problem_text,
+                        )
+                    except Exception as e:
+                        print(f"Error scheduling solution processing: {e}")
+                        # Don't fail the submission if scheduling fails for one item
+            except Exception as e:
+                print(f"Error scheduling batch solution processing: {e}")
 
             flash(f'Successfully submitted {len(created_solutions)} solution(s) for students!', 'success')
             return redirect(url_for('view_solutions', assignment_id=assignment_id))

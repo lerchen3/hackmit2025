@@ -49,7 +49,7 @@ class SolutionGraph:
     EMBED_DIM = 3072  # Dimension of the embedding vectors (matches API embedding model)
     SEARCH_COUNT = 3  # Number of similar steps to retrieve during similarity search
     DISTANCE_THRESHOLD = 3072  # Maximum distance threshold for considering steps as similar
-    api_manager = APIManager("bnxe")  # Shared API manager instance for all operations
+    api_manager = APIManager("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")  # Shared API manager instance for all operations
 
     def __init__(self, problem_text, subject_domain="math"):
         """
@@ -148,8 +148,8 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
                 "role": "system",
                 "content": """Fundamentally, are these two solutions the same? They need to use the all of the exact same ideas, the same technique, and the same means of execution.
 
-Don't overthink it! It should be obvious whether or not they're doing the same thing or not: Okay reasons are, say, \"Solution 1 uses length XY while solution 2 does not; no.\"
-
+Don't overthink it! It should be obvious whether or not they're doing the same thing or not. Be quite lenient on this: stylistic choices are completely fine, and slight variation in equations is fine as well.
+ 
 Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too much or analyzing the solutions too much.""",
             },
             {
@@ -590,7 +590,7 @@ class SolutionTree:
             if step_text is not None:
                 self.parent_summary = step_text  # Store the solution text
 
-    api_manager = APIManager("bnxe")  # Shared API manager for LLM queries
+    api_manager = APIManager("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")  # Shared API manager for LLM queries
 
     def __init__(self, problem_text, subject_domain="math"):
         """

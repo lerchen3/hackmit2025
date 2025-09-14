@@ -25,7 +25,7 @@ class APIManager:
 
         # Config: provider and prompt settings
         self.config_path = os.path.abspath(os.path.join(os.getcwd(), "config.json"))
-        self.default_provider = "openai"  # "openai" | "vllm"
+        self.default_provider = "vllm"  # "openai" | "vllm"
         self.prompt_type = "original"     # "original" | "concise"
         self.default_models = {
             "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
@@ -64,6 +64,19 @@ class APIManager:
                 else:
                     debug_tokens = self.debug_tokens
 
+                # Normalize provider even when input was not a dict
+                provider = str(provider).lower()
+                if provider == "vllm":
+                    provider = "local"
+
+                # If a bare messages list was provided, wrap into a full payload dict
+                if not isinstance(payload, dict):
+                    model_name = self.default_models.get("openai" if provider == "openai" else "vllm")
+                    messages = payload
+                    if self.prompt_type == "concise":
+                        messages = self._apply_concise_hint(messages)
+                    payload = {"model": model_name, "messages": messages}
+
                 # Execute request
                 if isinstance(payload, dict):
                     # Ensure model present; if missing, choose based on provider
@@ -100,18 +113,10 @@ class APIManager:
                 except Exception:
                     req_id = f"ag_{uuid.uuid4().hex}"
 
-                if provider == "local":
+                if provider == "local" or provider == "vllm":
                     resp = self.vllm.chat.completions.create(**payload)
                 elif provider == "openai":
-                    if isinstance(payload, dict):
-                        resp = self.openai.chat.completions.create(**payload)
-                    else:
-                        # messages list only; choose default model
-                        model_name = self.default_models.get("openai", "gpt-4o-mini")
-                        messages = data
-                        if self.prompt_type == "concise":
-                            messages = self._apply_concise_hint(messages)
-                        resp = self.openai.chat.completions.create(model=model_name, messages=messages)
+                    resp = self.openai.chat.completions.create(**payload)
                 else:
                     raise ValueError(f"Unsupported provider: {provider}")
 
@@ -214,12 +219,7 @@ class APIManager:
                 })
             except Exception:
                 pass
-            if provider == "local":
-                resp_stream = self.vllm.chat.completions.create(**payload)
-            elif provider == "openai":
-                resp_stream = self.openai.chat.completions.create(**payload)
-            else:
-                raise ValueError(f"Unsupported provider: {provider}")
+            provider = "local"
 
             for chunk in resp_stream:
                 try:
