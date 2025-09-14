@@ -971,3 +971,25 @@ function showGraph() {
 
 // Export showGraph function
 window.showGraph = showGraph;
+
+// Upload solutions CSV helper (teacher)
+function uploadSolutionsCsv(file, assignmentId, selectedStudentIds = []) {
+    if (!file || !assignmentId) {
+        console.error('CSV file and assignmentId are required');
+        return Promise.reject(new Error('CSV file and assignmentId are required'));
+    }
+    const formData = new FormData();
+    formData.append('solutions_csv', file);
+    if (selectedStudentIds && selectedStudentIds.length > 0) {
+        formData.append('student_ids', JSON.stringify(selectedStudentIds));
+    }
+    return fetch(`/teacher/assignment/${assignmentId}/submit-solutions`, {
+        method: 'POST',
+        body: formData
+    }).then(res => {
+        if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+        return res.text();
+    });
+}
+
+window.uploadSolutionsCsv = uploadSolutionsCsv;

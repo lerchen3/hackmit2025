@@ -1,5 +1,7 @@
 from openai import OpenAI
 import os
+import json
+import re
 
 class APIManager:
     ATTEMPTS = 3
@@ -18,6 +20,17 @@ class APIManager:
             api_key=os.getenv("VLLM_API_KEY", "test-123")
         )
 
+        # Config: provider and prompt settings
+        self.config_path = os.path.abspath(os.path.join(os.getcwd(), "config.json"))
+        self.default_provider = "openai"  # "openai" | "vllm"
+        self.prompt_type = "original"     # "original" | "concise"
+        self.default_models = {
+            "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "vllm": os.getenv("VLLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+        }
+        self.concise_hint = "Really don't think too hard and be concise."
+        self._load_config()
+
         # Usage tracking and debug flag
         self.last_usage = None
         self.debug_tokens = False
@@ -33,27 +46,44 @@ class APIManager:
         return None
     
     # Query chat completions; accepts either full JSON payload (dict) or messages list
-    # If a dict includes key "provider", routes to that provider: "openai" | "local"
+    # If a dict includes key "provider", routes to that provider: "openai" | "vllm" (alias for local)
     def query(self, data):
         for i in range(0,APIManager.ATTEMPTS):
             try:
-                provider = "openai"
+                provider = self.default_provider
                 payload = data
                 if isinstance(data, dict):
-                    provider = data.get("provider", "openai").lower()
+                    provider = data.get("provider", self.default_provider).lower()
+                    if provider == "vllm":
+                        provider = "local"
                     debug_tokens = data.get("debug_tokens", self.debug_tokens)
                     payload = {k: v for k, v in data.items() if k not in ("provider", "debug_tokens")}
                 else:
                     debug_tokens = self.debug_tokens
 
                 # Execute request
+                if isinstance(payload, dict):
+                    # Ensure model present; if missing, choose based on provider
+                    if "model" not in payload:
+                        chosen = self.default_models.get("vllm" if provider == "local" else "openai")
+                        if chosen:
+                            payload["model"] = chosen
+                    # If concise prompts enabled, add a small hint to the last user message
+                    if self.prompt_type == "concise" and "messages" in payload:
+                        payload["messages"] = self._apply_concise_hint(payload["messages"]) 
+
                 if provider == "local":
                     resp = self.vllm.chat.completions.create(**payload)
                 elif provider == "openai":
-                    if isinstance(data, dict):
+                    if isinstance(payload, dict):
                         resp = self.openai.chat.completions.create(**payload)
                     else:
-                        resp = self.openai.chat.completions.create(model="gpt-4o-mini", messages=data)
+                        # messages list only; choose default model
+                        model_name = self.default_models.get("openai", "gpt-4o-mini")
+                        messages = data
+                        if self.prompt_type == "concise":
+                            messages = self._apply_concise_hint(messages)
+                        resp = self.openai.chat.completions.create(model=model_name, messages=messages)
                 else:
                     raise ValueError(f"Unsupported provider: {provider}")
 
@@ -74,10 +104,12 @@ class APIManager:
     # Stream chat completions; yields text chunks. Accepts same payload as query.
     # If debug_tokens True, prints usage at end when available.
     def stream(self, data):
-        provider = "openai"
+        provider = self.default_provider
         payload = data
         if isinstance(data, dict):
-            provider = data.get("provider", "openai").lower()
+            provider = data.get("provider", self.default_provider).lower()
+            if provider == "vllm":
+                provider = "local"
             debug_tokens = data.get("debug_tokens", self.debug_tokens)
             payload = {k: v for k, v in data.items() if k not in ("provider", "debug_tokens")}
         else:
@@ -88,6 +120,15 @@ class APIManager:
         # Ask OpenAI SDK to include usage in the final stream event when possible
         if provider == "openai":
             payload.setdefault("stream_options", {"include_usage": True})
+
+        # Ensure default model and prompt concision
+        if isinstance(payload, dict):
+            if "model" not in payload:
+                chosen = self.default_models.get("vllm" if provider == "local" else "openai")
+                if chosen:
+                    payload["model"] = chosen
+            if self.prompt_type == "concise" and "messages" in payload:
+                payload["messages"] = self._apply_concise_hint(payload["messages"]) 
 
         self.last_usage = None
 
@@ -121,6 +162,48 @@ class APIManager:
                     print(f"[{provider}] tokens prompt={counts['prompt']} completion={counts['completion']} total={counts['total']}")
         except Exception as e:
             print(f"Error streaming API: {str(e)}")
+
+    # --- Config and prompt utilities ---
+    def _load_config(self):
+        try:
+            if os.path.exists(self.config_path):
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                provider = str(cfg.get("provider", self.default_provider)).lower()
+                if provider in ("openai", "vllm"):
+                    self.default_provider = provider
+                self.prompt_type = str(cfg.get("prompt_type", self.prompt_type)).lower()
+                models = cfg.get("models", {})
+                if isinstance(models, dict):
+                    self.default_models.update(models)
+                # Optional concise hint override
+                hint = cfg.get("concise_hint")
+                if isinstance(hint, str) and hint.strip():
+                    self.concise_hint = hint.strip()
+        except Exception as e:
+            print(f"Warning: failed to load config.json: {e}")
+
+    def _apply_concise_hint(self, messages):
+        if not isinstance(messages, list):
+            return messages
+        try:
+            new_messages = []
+            last_user_idx = -1
+            for idx, m in enumerate(messages):
+                if isinstance(m, dict):
+                    new_messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
+                    if m.get("role") == "user":
+                        last_user_idx = idx
+            if last_user_idx >= 0:
+                content = new_messages[last_user_idx]["content"] or ""
+                hint = self.concise_hint
+                if hint not in content:
+                    new_messages[last_user_idx]["content"] = f"{content}\n\n{hint}" if content else hint
+            else:
+                new_messages.append({"role": "user", "content": self.concise_hint})
+            return new_messages
+        except Exception:
+            return messages
 
     def _get_usage_value(self, usage, names):
         for n in names:

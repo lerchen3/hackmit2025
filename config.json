@@ -1,0 +1,11 @@
+{
+  "provider": "vllm",
+  "prompt_type": "concise",
+  "concise_hint": "Really don't overthink too hard and be concise in your final output.",
+  "models": {
+    "openai": "o4-mini",
+    "vllm": "QuixiAI/Qwen3-235B-A22B-AWQ"
+  }
+}
+
+
