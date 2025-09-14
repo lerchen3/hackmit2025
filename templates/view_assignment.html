@@ -52,7 +52,7 @@
                     <div class="mb-6">
                         <h4 class="text-md font-medium text-gray-900 mb-2">Description:</h4>
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ assignment.description_text }}</p>
+                            <div class="text-sm text-gray-700 whitespace-pre-wrap latex-content" id="assignment-description-{{ assignment.id }}">{{ assignment.description_text }}</div>
                         </div>
                     </div>
                     {% endif %}
@@ -96,11 +96,19 @@
                             </label>
                             <textarea id="solution_text" name="solution_text" rows="8" 
                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                      placeholder="Enter your solution here...">{{ solution.solution_text if solution else '' }}</textarea>
+                                      placeholder="Enter your solution here..." 
+                                      oninput="updateLatexPreview('solution_text', 'solution_preview')">{{ solution.solution_text if solution else '' }}</textarea>
                             <p class="mt-2 text-sm text-gray-500">
                                 <i class="fas fa-info-circle mr-1"></i>
                                 Provide a detailed text solution to the assignment.
                             </p>
+                            <!-- Live LaTeX Preview -->
+                            <div class="mt-3">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">Live Preview:</h5>
+                                <div class="bg-gray-50 border border-gray-200 rounded-md p-3 min-h-20">
+                                    <div id="solution_preview" class="text-sm text-gray-700 latex-content"></div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div>
@@ -122,11 +130,19 @@
                             </label>
                             <textarea id="final_answer" name="final_answer" rows="4" 
                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                      placeholder="Enter your final answer here...">{{ solution.final_answer if solution else '' }}</textarea>
+                                      placeholder="Enter your final answer here..." 
+                                      oninput="updateLatexPreview('final_answer', 'final_answer_preview')">{{ solution.final_answer if solution else '' }}</textarea>
                             <p class="mt-2 text-sm text-gray-500">
                                 <i class="fas fa-info-circle mr-1"></i>
                                 Provide a concise final answer or conclusion to your solution.
                             </p>
+                            <!-- Live LaTeX Preview -->
+                            <div class="mt-3">
+                                <h5 class="text-sm font-medium text-gray-700 mb-2">Live Preview:</h5>
+                                <div class="bg-gray-50 border border-gray-200 rounded-md p-3 min-h-16">
+                                    <div id="final_answer_preview" class="text-sm text-gray-700 latex-content"></div>
+                                </div>
+                            </div>
                         </div>
                         
                         {% if solution and solution.solution_file %}
@@ -178,7 +194,7 @@
                     <div class="mb-4">
                         <h4 class="text-sm font-medium text-gray-900 mb-2">Text Solution:</h4>
                         <div class="bg-gray-50 border border-gray-200 rounded-md p-3">
-                            <p class="text-xs text-gray-700">{{ solution.solution_text[:100] }}{% if solution.solution_text|length > 100 %}...{% endif %}</p>
+                            <div class="text-xs text-gray-700 latex-content" id="solution-preview-text-{{ solution.id }}">{{ solution.solution_text[:100] }}{% if solution.solution_text|length > 100 %}...{% endif %}</div>
                         </div>
                     </div>
                     {% endif %}
@@ -192,6 +208,15 @@
                                 <p class="text-sm font-medium text-gray-900">{{ solution.solution_file }}</p>
                                 <p class="text-xs text-gray-500">PDF Document</p>
                             </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if solution.final_answer %}
+                    <div class="mb-4">
+                        <h4 class="text-sm font-medium text-gray-900 mb-2">Final Answer:</h4>
+                        <div class="bg-gray-50 border border-gray-200 rounded-md p-3">
+                            <div class="text-xs text-gray-700 latex-content" id="solution-preview-final-{{ solution.id }}">{{ solution.final_answer }}</div>
                         </div>
                     </div>
                     {% endif %}
@@ -231,32 +256,6 @@
                 </div>
             </div>
             
-            <!-- Submission Tips -->
-            <div class="bg-white shadow rounded-lg">
-                <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                        <i class="fas fa-lightbulb text-primary mr-2"></i>Submission Tips
-                    </h3>
-                    <ul class="space-y-2 text-sm text-gray-600">
-                        <li class="flex items-center">
-                            <i class="fas fa-check text-success mr-2"></i>
-                            Read the assignment description carefully
-                        </li>
-                        <li class="flex items-center">
-                            <i class="fas fa-check text-success mr-2"></i>
-                            Provide clear and detailed solutions
-                        </li>
-                        <li class="flex items-center">
-                            <i class="fas fa-check text-success mr-2"></i>
-                            Use both text and file formats if helpful
-                        </li>
-                        <li class="flex items-center">
-                            <i class="fas fa-check text-success mr-2"></i>
-                            Check your work before submitting
-                        </li>
-                    </ul>
-                </div>
-            </div>
         </div>
     </div>
 </div>

@@ -42,7 +42,7 @@
                     <div class="mb-6">
                         <h4 class="text-md font-medium text-gray-900 mb-2">Text Solution:</h4>
                         <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                            <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{ solution.solution_text }}</pre>
+                            <div class="text-sm text-gray-700 whitespace-pre-wrap latex-content" id="solution-text-{{ solution.id }}">{{ solution.solution_text }}</div>
                         </div>
                     </div>
                     {% endif %}
@@ -75,7 +75,7 @@
                             <i class="fas fa-flag-checkered mr-2"></i>Final Answer:
                         </h4>
                         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{ solution.final_answer }}</pre>
+                            <div class="text-sm text-gray-700 whitespace-pre-wrap latex-content" id="final-answer-{{ solution.id }}">{{ solution.final_answer }}</div>
                         </div>
                     </div>
                     {% endif %}
@@ -162,7 +162,7 @@
                         {% if assignment.description_text %}
                         <div>
                             <h5 class="text-sm font-medium text-gray-900 mb-2">Description:</h5>
-                            <p class="text-sm text-gray-700">{{ assignment.description_text }}</p>
+                            <div class="text-sm text-gray-700 latex-content" id="assignment-description-{{ assignment.id }}">{{ assignment.description_text }}</div>
                         </div>
                         {% endif %}
                         

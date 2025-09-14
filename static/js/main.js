@@ -791,8 +791,43 @@ function makeRequest(url, options = {}) {
         });
 }
 
+// LaTeX preview functionality
+function updateLatexPreview(sourceId, previewId) {
+    const sourceElement = document.getElementById(sourceId);
+    const previewElement = document.getElementById(previewId);
+    
+    if (sourceElement && previewElement) {
+        const content = sourceElement.value;
+        previewElement.textContent = content;
+        
+        // Re-render LaTeX in the preview element
+        if (window.MathJax) {
+            window.MathJax.typesetPromise([previewElement]).catch(function (err) {
+                console.log('MathJax preview rendering error:', err);
+            });
+        }
+    }
+}
+
+// Initialize LaTeX previews when page loads
+function initializeLatexPreviews() {
+    // Initialize previews for existing content
+    const solutionText = document.getElementById('solution_text');
+    const finalAnswer = document.getElementById('final_answer');
+    
+    if (solutionText) {
+        updateLatexPreview('solution_text', 'solution_preview');
+    }
+    
+    if (finalAnswer) {
+        updateLatexPreview('final_answer', 'final_answer_preview');
+    }
+}
+
 // Export functions for global use
 window.initializeGraph = initializeGraph;
 window.formatDate = formatDate;
 window.formatFileSize = formatFileSize;
 window.makeRequest = makeRequest;
+window.updateLatexPreview = updateLatexPreview;
+window.initializeLatexPreviews = initializeLatexPreviews;

@@ -6,6 +6,21 @@
     <title>{% block title %}Assignment System{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- MathJax for LaTeX support -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                processEnvironments: true
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -190,6 +205,32 @@
             
             if (!mobileMenuButton && !mobileMenu.contains(event.target)) {
                 mobileMenu.classList.add('hidden');
+            }
+        });
+
+        // LaTeX rendering function
+        function renderLatex(elementId) {
+            const element = document.getElementById(elementId);
+            if (element && window.MathJax) {
+                window.MathJax.typesetPromise([element]).catch(function (err) {
+                    console.log('MathJax rendering error:', err);
+                });
+            }
+        }
+
+        // Render LaTeX when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Render LaTeX in all elements with class 'latex-content'
+            const latexElements = document.querySelectorAll('.latex-content');
+            if (latexElements.length > 0 && window.MathJax) {
+                window.MathJax.typesetPromise(latexElements).catch(function (err) {
+                    console.log('MathJax rendering error:', err);
+                });
+            }
+            
+            // Initialize LaTeX previews if the function exists
+            if (typeof initializeLatexPreviews === 'function') {
+                initializeLatexPreviews();
             }
         });
     </script>
