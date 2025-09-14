@@ -1,4 +1,5 @@
 // Main JavaScript for Assignment System
+console.log('main.js loaded successfully');
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltips
@@ -72,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Graph visualization functions
 function initializeGraph(containerId, graphData, layoutType = 'dag') {
+    console.log('initializeGraph function called');
     const container = document.getElementById(containerId);
     if (!container) return;
     
@@ -132,12 +134,12 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
 
     // Convert graph edges to proper format for D3
     const edges = graphData.graph.map(edge => ({
-        source: edge.from,
-        target: edge.to
+        source: edge[0],
+        target: edge[1]
     }));
 
     // Generate nodes from the graph structure using 0-indexed integers
-    const nodeIds = [...new Set([...graphData.graph.map(e => e.from), ...graphData.graph.map(e => e.to)])].sort((a, b) => a - b);
+    const nodeIds = [...new Set([...graphData.graph.map(e => e[0]), ...graphData.graph.map(e => e[1])])].sort((a, b) => a - b);
     
     // Create a hierarchical layout for better symmetry
     const createHierarchicalLayout = (nodeIds, edges) => {
@@ -281,7 +283,7 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         let nodeType;
         if (id === 0) {
             nodeType = 'start'; // Start node is always special
-        } else if (layoutType === 'dag' && id === nodeIds[nodeIds.length - 1]) {
+        } else if (layoutType === 'dag' && id === nodeIds[1]) {
             nodeType = 'end'; // Last node is end node for DAG layout
         } else {
             nodeType = 'process'; // All other nodes are process nodes
@@ -334,7 +336,10 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         
         const node = {
             id: id,
-            label: graphData.step_summary && graphData.step_summary[id] ? graphData.step_summary[id] : `Step ${id}`,
+            label: (graphData.step_summaries && graphData.step_summaries[id]) || 
+                 (graphData.step_summary && graphData.step_summary[id]) ? 
+                 (graphData.step_summaries && graphData.step_summaries[id] ? graphData.step_summaries[id] : graphData.step_summary[id]) : 
+                 `Step ${id}`,
             type: nodeType,
             is_correct: graphData.step_is_correct && graphData.step_is_correct[id] !== undefined ? graphData.step_is_correct[id] : true,
             x: x,
@@ -467,22 +472,9 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 clearTimeout(this.tooltipTimeout);
             }
             
-            // Check if tooltip is already visible from highlighting
-            const tooltipGroup = d3.select(this.parentNode).select('.tooltip-group');
-            const isAlreadyVisible = tooltipGroup.attr('opacity') == 1;
-            
-            // If already visible from highlighting, don't do anything
-            if (isAlreadyVisible) {
-                return;
-            }
-            
             // Show tooltip after a small delay to prevent flickering
             this.tooltipTimeout = setTimeout(() => {
-                // Double-check if tooltip is still not visible (in case highlighting changed)
-                const currentOpacity = tooltipGroup.attr('opacity');
-                if (currentOpacity == 1) {
-                    return; // Already visible from highlighting
-                }
+                const tooltipGroup = d3.select(this.parentNode).select('.tooltip-group');
                 
                 // Get text dimensions for proper sizing
                 const tooltipText = tooltipGroup.select('.tooltip-text');
@@ -516,17 +508,12 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 clearTimeout(this.tooltipTimeout);
             }
             
-            // Check if tooltip is visible from highlighting - if so, don't hide it
+            // Hide tooltip bubble
             const tooltipGroup = d3.select(this.parentNode).select('.tooltip-group');
-            const isFromHighlighting = tooltipGroup.classed('highlighted-tooltip');
-            
-            if (!isFromHighlighting) {
-                // Hide tooltip bubble only if it's not from highlighting
-                tooltipGroup
-                    .transition()
-                    .duration(200)
-                    .attr('opacity', 0);
-            }
+            tooltipGroup
+                .transition()
+                .duration(200)
+                .attr('opacity', 0);
             
             // Return circle to normal size
             d3.select(this.parentNode).select('circle')
@@ -535,18 +522,76 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 .attr('r', 20);
         });
 
-    // Add labels to nodes (visible for start and end nodes)
+    // Add hover functionality for start and end nodes to show tooltips
+    node.filter(d => d.type === 'start' || d.type === 'end')
+        .on('mouseover', function(event, d) {
+            // Clear any existing timeout
+            if (this.tooltipTimeout) {
+                clearTimeout(this.tooltipTimeout);
+            }
+            
+            // Show tooltip after a small delay to prevent flickering
+            this.tooltipTimeout = setTimeout(() => {
+                const tooltipGroup = d3.select(this).select('.tooltip-group');
+                
+                // Get text dimensions for proper sizing
+                const tooltipText = tooltipGroup.select('.tooltip-text');
+                const textNode = tooltipText.node();
+                const bbox = textNode.getBBox();
+                const padding = 8;
+                
+                // Update background size based on text
+                tooltipGroup.select('.tooltip-bg')
+                    .attr('x', -bbox.width/2 - padding)
+                    .attr('y', -bbox.height/2 - padding)
+                    .attr('width', bbox.width + (padding * 2))
+                    .attr('height', bbox.height + (padding * 2));
+                
+                // Show the tooltip
+                tooltipGroup
+                    .transition()
+                    .duration(200)
+                    .attr('opacity', 1);
+                
+                // Slightly enlarge the visible circle
+                d3.select(this).select('circle')
+                    .transition()
+                    .duration(200)
+                    .attr('r', 25);
+            }, 100); // 100ms delay
+        })
+        .on('mouseout', function(event, d) {
+            // Clear timeout if mouse leaves before tooltip shows
+            if (this.tooltipTimeout) {
+                clearTimeout(this.tooltipTimeout);
+            }
+            
+            // Hide tooltip bubble
+            const tooltipGroup = d3.select(this).select('.tooltip-group');
+            tooltipGroup
+                .transition()
+                .duration(200)
+                .attr('opacity', 0);
+            
+            // Return circle to normal size
+            d3.select(this).select('circle')
+                .transition()
+                .duration(200)
+                .attr('r', 20);
+        });
+
+    // Add labels to nodes (only for process nodes, start/end nodes will use tooltips)
     node.append('text')
         .attr('text-anchor', 'middle')
         .attr('dy', '.35em')
-        .attr('fill', d => (d.type === 'start' || d.type === 'end') ? '#000000' : 'white')
+        .attr('fill', 'white')
         .attr('font-size', '12px')
         .attr('font-weight', 'bold')
-        .attr('opacity', d => (d.type === 'start' || d.type === 'end') ? 1 : 0)
+        .attr('opacity', 0) // Hide all text labels by default
         .text(d => d.label);
 
-    // Create tooltip groups for process nodes
-    const tooltipGroups = node.filter(d => d.type === 'process')
+    // Create tooltip groups for all nodes (process, start, and end)
+    const tooltipGroups = node
         .append('g')
         .attr('class', 'tooltip-group')
         .attr('opacity', 0)
@@ -586,7 +631,7 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
             .attr('y2', d => d.target.y);
 
         node
-            .attr('transform', d => `translate(${d.x},${d.y})`);
+            .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
     });
 
     // Drag functions
@@ -654,10 +699,9 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
         });
         link.attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
         
-        // Hide all tooltips and clear highlighting class
-        node.filter(d => d.type === 'process')
+        // Hide all tooltips
+        node
             .select('.tooltip-group')
-            .classed('highlighted-tooltip', false)
             .transition()
             .duration(200)
             .attr('opacity', 0);
@@ -687,30 +731,7 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
                 return 4;
             });
         
-        // Show tooltips for highlighted process nodes
-        highlightedNodes.filter(d => d.type === 'process')
-            .select('.tooltip-group')
-            .each(function(d) {
-                const tooltipGroup = d3.select(this);
-                const tooltipText = tooltipGroup.select('.tooltip-text');
-                const textNode = tooltipText.node();
-                const bbox = textNode.getBBox();
-                const padding = 8;
-                
-                // Update background size based on text
-                tooltipGroup.select('.tooltip-bg')
-                    .attr('x', -bbox.width/2 - padding)
-                    .attr('y', -bbox.height/2 - padding)
-                    .attr('width', bbox.width + (padding * 2))
-                    .attr('height', bbox.height + (padding * 2));
-                
-                // Show the tooltip and mark it as from highlighting
-                tooltipGroup
-                    .classed('highlighted-tooltip', true)
-                    .transition()
-                    .duration(200)
-                    .attr('opacity', 1);
-            });
+        // Don't show tooltips when highlighting - only show on hover
         
         // Highlight path links
         link.filter(d => {
@@ -752,6 +773,12 @@ function initializeGraph(containerId, graphData, layoutType = 'dag') {
     // Return highlight function for external use
     return highlightStudentPath;
 }
+
+console.log('initializeGraph function defined, type:', typeof initializeGraph);
+
+// Ensure initializeGraph is available on window immediately
+window.initializeGraph = initializeGraph;
+console.log('initializeGraph assigned to window, type:', typeof window.initializeGraph);
 
 // Utility functions
 function formatDate(dateString) {
@@ -825,9 +852,71 @@ function initializeLatexPreviews() {
 }
 
 // Export functions for global use
-window.initializeGraph = initializeGraph;
+// window.initializeGraph = initializeGraph; // Already assigned above
 window.formatDate = formatDate;
 window.formatFileSize = formatFileSize;
 window.makeRequest = makeRequest;
 window.updateLatexPreview = updateLatexPreview;
 window.initializeLatexPreviews = initializeLatexPreviews;
+
+// Show graph function
+function showGraph() {
+    const container = document.getElementById('graph-container');
+    if (!container) {
+        console.error('Graph container not found');
+        return;
+    }
+    
+    // Show loading state
+    container.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-96">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p class="mt-4 text-gray-600">Loading graph...</p>
+        </div>
+    `;
+    
+    // Get assignment ID from the current page URL
+    const assignmentId = window.location.pathname.split('/').pop();
+    if (!assignmentId || isNaN(assignmentId)) {
+        console.error('Could not determine assignment ID');
+        container.innerHTML = '<div class="text-center text-red-600">Could not determine assignment ID</div>';
+        return;
+    }
+    
+    // Fetch graph data
+    fetch(`/api/solution-graph/${assignmentId}`)
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 403) {
+                    throw new Error('Access denied. Only teachers can view solution graphs.');
+                } else if (response.status === 404) {
+                    throw new Error('Graph data not found.');
+                } else {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+            }
+            return response.json();
+        })
+        .then(data => {
+            container.innerHTML = '';
+            
+            // Store graph data globally for multi-student highlighting
+            window.graphData = data;
+            
+            // Initialize the graph with DAG layout
+            if (typeof initializeGraph === 'function') {
+                window.highlightFunction = initializeGraph('graph-container', data, 'dag');
+            } else {
+                console.error('initializeGraph function not available');
+                container.innerHTML = '<div class="text-center text-red-600">Graph visualization function not loaded</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading graph:', error);
+            container.innerHTML = 
+                '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">' + error.message + '</p></div></div></div>';
+        });
+}
+
+// Export showGraph function
+window.showGraph = showGraph;

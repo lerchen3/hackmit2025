@@ -310,8 +310,22 @@ function loadGraphData() {
             // Store graph data globally for multi-student highlighting
             window.graphData = data;
             
-            // Initialize the graph with DAG layout
-            highlightFunction = initializeGraph('graph-container', data, 'dag');
+            // Debug: Check if initializeGraph is available
+            console.log('initializeGraph available:', typeof initializeGraph);
+            console.log('window.initializeGraph available:', typeof window.initializeGraph);
+            
+            // Wait for initializeGraph to be available
+            const waitForInitializeGraph = () => {
+                if (typeof window.initializeGraph === 'function') {
+                    console.log('initializeGraph found, initializing graph...');
+                    highlightFunction = window.initializeGraph('graph-container', data, 'dag');
+                } else {
+                    console.log('initializeGraph not yet available, waiting...');
+                    setTimeout(waitForInitializeGraph, 100);
+                }
+            };
+            
+            waitForInitializeGraph();
         })
         .catch(error => {
             console.error('Error loading graph:', error);
@@ -362,11 +376,9 @@ function highlightMultipleSubmissions(submissionUids) {
     svg.selectAll('.node circle').attr('stroke', '#fff').attr('stroke-width', 2);
     svg.selectAll('line').attr('stroke', '#999').attr('stroke-opacity', 0.6).attr('stroke-width', 2).attr('marker-end', 'url(#arrowhead)');
     
-    // Hide all tooltips and clear highlighting class
+    // Hide all tooltips
     svg.selectAll('.node')
-        .filter(d => d.type === 'process')
         .select('.tooltip-group')
-        .classed('highlighted-tooltip', false)
         .transition()
         .duration(200)
         .attr('opacity', 0);
@@ -394,30 +406,7 @@ function highlightMultipleSubmissions(submissionUids) {
         .attr('stroke', '#ffc107')
         .attr('stroke-width', 4);
     
-    // Show tooltips for highlighted process nodes
-    highlightedNodes.filter(d => d.type === 'process')
-        .select('.tooltip-group')
-        .each(function(d) {
-            const tooltipGroup = d3.select(this);
-            const tooltipText = tooltipGroup.select('.tooltip-text');
-            const textNode = tooltipText.node();
-            const bbox = textNode.getBBox();
-            const padding = 8;
-            
-            // Update background size based on text
-            tooltipGroup.select('.tooltip-bg')
-                .attr('x', -bbox.width/2 - padding)
-                .attr('y', -bbox.height/2 - padding)
-                .attr('width', bbox.width + (padding * 2))
-                .attr('height', bbox.height + (padding * 2));
-            
-            // Show the tooltip and mark it as from highlighting
-            tooltipGroup
-                .classed('highlighted-tooltip', true)
-                .transition()
-                .duration(200)
-                .attr('opacity', 1);
-        });
+    // Don't show tooltips when highlighting - only show on hover
     
     // Highlight all links
     svg.selectAll('line')
@@ -586,8 +575,22 @@ function loadTreeLayout() {
             
             // Initialize the graph with tree layout
             console.log('Initializing tree graph...');
-            highlightFunction = initializeGraph('graph-container', data, 'tree');
-            console.log('Tree graph initialized');
+            console.log('initializeGraph available:', typeof initializeGraph);
+            console.log('window.initializeGraph available:', typeof window.initializeGraph);
+            
+            // Wait for initializeGraph to be available
+            const waitForInitializeGraphTree = () => {
+                if (typeof window.initializeGraph === 'function') {
+                    console.log('initializeGraph found, initializing tree graph...');
+                    highlightFunction = window.initializeGraph('graph-container', data, 'tree');
+                    console.log('Tree graph initialized');
+                } else {
+                    console.log('initializeGraph not yet available for tree, waiting...');
+                    setTimeout(waitForInitializeGraphTree, 100);
+                }
+            };
+            
+            waitForInitializeGraphTree();
             
             // Re-apply highlighting based on current selection
             setTimeout(() => {
@@ -632,8 +635,22 @@ function loadDAGLayout() {
             
             // Initialize the graph with DAG layout
             console.log('Initializing DAG graph...');
-            highlightFunction = initializeGraph('graph-container', data, 'dag');
-            console.log('DAG graph initialized');
+            console.log('initializeGraph available:', typeof initializeGraph);
+            console.log('window.initializeGraph available:', typeof window.initializeGraph);
+            
+            // Wait for initializeGraph to be available
+            const waitForInitializeGraphDAG = () => {
+                if (typeof window.initializeGraph === 'function') {
+                    console.log('initializeGraph found, initializing DAG graph...');
+                    highlightFunction = window.initializeGraph('graph-container', data, 'dag');
+                    console.log('DAG graph initialized');
+                } else {
+                    console.log('initializeGraph not yet available for DAG, waiting...');
+                    setTimeout(waitForInitializeGraphDAG, 100);
+                }
+            };
+            
+            waitForInitializeGraphDAG();
             
             // Re-apply highlighting based on current selection
             setTimeout(() => {

@@ -166,6 +166,11 @@
                         </div>
                         {% endif %}
                         
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-900 mb-2">Correct Answer:</h5>
+                            <div class="text-sm text-gray-700 latex-content" id="assignment-correct-answer-{{ assignment.id }}">{{ assignment.correct_answer }}</div>
+                        </div>
+                        
                         {% if assignment.description_image %}
                         <div>
                             <h5 class="text-sm font-medium text-gray-900 mb-2">Description Image:</h5>

@@ -6,6 +6,11 @@ from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
 import json
+from dotenv import load_dotenv
+from graph_manager import graph_manager
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -42,6 +47,7 @@ class Assignment(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description_text = db.Column(db.Text, nullable=True)
     description_image = db.Column(db.String(200), nullable=True)
+    correct_answer = db.Column(db.Text, nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -179,6 +185,7 @@ def create_assignment():
     if request.method == 'POST':
         title = request.form['title']
         description_text = request.form.get('description_text', '')
+        correct_answer = request.form['correct_answer']
         description_image = None
         
         if 'description_image' in request.files:
@@ -192,6 +199,7 @@ def create_assignment():
         assignment = Assignment(
             title=title,
             description_text=description_text,
+            correct_answer=correct_answer,
             description_image=description_image,
             created_by=current_user.id
         )
@@ -253,6 +261,30 @@ def submit_solution(assignment_id):
         db.session.add(solution)
     
     db.session.commit()
+    
+    # Process solution with graph manager
+    try:
+        assignment = Assignment.query.get(assignment_id)
+        if assignment:
+            solution_file_path = None
+            if solution_file:
+                solution_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'solutions', solution_file)
+            
+            solution_uid = f"{current_user.username}_{solution.id}"
+            problem_text = assignment.description_text or ""
+            graph_manager.process_solution(
+                assignment_id=assignment_id,
+                solution_uid=solution_uid,
+                solution_text=solution_text,
+                solution_file_path=solution_file_path,
+                final_answer=final_answer,
+                correct_answer=assignment.correct_answer,
+                problem_text=problem_text
+            )
+    except Exception as e:
+        print(f"Error processing solution with graph manager: {e}")
+        # Don't fail the submission if graph processing fails
+    
     flash('Solution submitted successfully!', 'success')
     return redirect(url_for('view_assignment', assignment_id=assignment_id))
 
@@ -365,63 +397,31 @@ def get_solution_graph(assignment_id):
     if not current_user.is_teacher:
         return jsonify({'error': 'Access denied'}), 403
     
-    # This is a placeholder for the graph generation
-    # In a real implementation, you would analyze the solutions and generate a graph
-    solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
-    
-    # Generate graph data in the new format with 0-indexed integer nodes
-    graph_data = {
-        'graph': [
-            {'from': 0, 'to': 1},
-            {'from': 1, 'to': 2},
-            {'from': 2, 'to': 3},
-            {'from': 3, 'to': 4},
-            {'from': 1, 'to': 5},
-            {'from': 5, 'to': 6},
-            {'from': 4, 'to': 6}
-        ],
-        'step_summary': [
-            'Start',      # step 0
-            'Apply first method',      # step 1
-            'Apply second method',     # step 2
-            'Apply third method',     # step 2
-            'Apply fourth method',     # step 2
-            'Finalize solution',       # step 3
-            'End'                 # step 4
-        ],
-        'step_is_correct': [
-            True,   # step 0
-            True,   # step 1
-            True,   # step 2
-            True,   # step 3
-            True,    # step 4
-            True,    # step 5
-            True,    # step 6
-        ],
-        'submissions': [
-            {
-                'submission_uid': 'student1_1',
-                'submission_nodes': [0, 1, 2, 3, 4, 6]
-            },
-            {
-                'submission_uid': 'student2_2',
-                'submission_nodes': [0, 1, 5, 6]
-            }
-        ]
-    }
-    
-    # Add student submissions
-    # for solution in solutions:
-    #     student = User.query.get(solution.student_id)
-    #     if student:
-    #         # Mock submission data - in real implementation, analyze the solution
-    #         submission_nodes = [0, 1, 2, 3, 4, 5, 6]  # 0-indexed integer steps
-    #         graph_data['submissions'].append({
-    #             'submission_uid': f"{student.username}_{solution.id}",
-    #             'submission_nodes': submission_nodes
-    #         })
-    
-    return jsonify(graph_data)
+    try:
+        # Get graph data from graph manager
+        graph_data = graph_manager.generate_graph(assignment_id)
+        
+        if graph_data is None:
+            print(f"No graph data found for assignment {assignment_id}")
+            # Check if there are any solutions for this assignment
+            solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
+            print(f"Found {len(solutions)} solutions for assignment {assignment_id}")
+            
+            # No solutions processed yet, return empty graph
+            return jsonify({
+                'graph': [],
+                'step_summary': ['Start', 'End'],
+                'step_is_correct': [True, True],
+                'submissions': []
+            })
+        
+        print(f"Generated graph data for assignment {assignment_id}: {len(graph_data.get('submissions', []))} submissions")
+        return jsonify(graph_data)
+    except Exception as e:
+        print(f"Error generating solution graph: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to generate graph'}), 500
 
 @app.route('/api/solution-graph-tree/<int:assignment_id>')
 @login_required
@@ -429,51 +429,23 @@ def get_solution_graph_tree(assignment_id):
     if not current_user.is_teacher:
         return jsonify({'error': 'Access denied'}), 403
     
-    # This is a placeholder for the tree graph generation
-    # In a real implementation, you would analyze the solutions and generate a tree graph
-    solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
-    
-    # Generate tree graph data with hierarchical structure
-    graph_data = {
-        'graph': [
-            {'from': 0, 'to': 1},
-            {'from': 0, 'to': 2},
-            {'from': 1, 'to': 3},
-            {'from': 1, 'to': 4},
-            {'from': 2, 'to': 5},
-            {'from': 2, 'to': 6}
-        ],
-        'step_summary': [
-            'Start',                    # step 0 - root
-            'Method A',                 # step 1 - level 1
-            'Method B',                 # step 2 - level 1
-            'Sub-method A1',           # step 3 - level 2
-            'Sub-method A2',           # step 4 - level 2
-            'Sub-method B1',           # step 5 - level 2
-            'Final Step'               # step 6 - level 2 (now a regular process node)
-        ],
-        'step_is_correct': [
-            True,   # step 0
-            True,   # step 1
-            True,   # step 2
-            True,   # step 3
-            True,   # step 4
-            True,   # step 5
-            True,   # step 6
-        ],
-        'submissions': [
-            {
-                'submission_uid': 'student1_1',
-                'submission_nodes': [0, 1, 3, 6]  # Path through Method A -> Sub-method A1 -> Final Step
-            },
-            {
-                'submission_uid': 'student2_2',
-                'submission_nodes': [0, 2, 5, 6]  # Path through Method B -> Sub-method B1 -> Final Step
-            }
-        ]
-    }
-    
-    return jsonify(graph_data)
+    try:
+        # Get tree data from graph manager
+        tree_data = graph_manager.generate_tree(assignment_id)
+        
+        if tree_data is None:
+            # No solutions processed yet, return empty tree
+            return jsonify({
+                'graph': [],
+                'step_summary': ['Start', 'End'],
+                'step_is_correct': [True, True],
+                'submissions': []
+            })
+        
+        return jsonify(tree_data)
+    except Exception as e:
+        print(f"Error generating solution tree: {e}")
+        return jsonify({'error': 'Failed to generate tree'}), 500
 
 # Database migration function
 def migrate_database():
@@ -481,20 +453,51 @@ def migrate_database():
     with app.app_context():
         try:
             # Check if final_answer column exists
-            result = db.engine.execute("PRAGMA table_info(solution)")
+            result = db.session.execute(db.text("PRAGMA table_info(solution)"))
             columns = [row[1] for row in result]
             
             if 'final_answer' not in columns:
                 print("Adding final_answer column to Solution table...")
-                db.engine.execute("ALTER TABLE solution ADD COLUMN final_answer TEXT")
+                db.session.execute(db.text("ALTER TABLE solution ADD COLUMN final_answer TEXT"))
+                db.session.commit()
                 print("Migration completed successfully!")
             else:
                 print("final_answer column already exists.")
         except Exception as e:
             print(f"Migration error: {e}")
 
+def process_existing_solutions():
+    """Process existing solutions with the graph manager"""
+    try:
+        solutions = Solution.query.all()
+        for solution in solutions:
+            assignment = Assignment.query.get(solution.assignment_id)
+            if assignment:
+                solution_file_path = None
+                if solution.solution_file:
+                    solution_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'solutions', solution.solution_file)
+                
+                solution_uid = f"{solution.student.username}_{solution.id}"
+                problem_text = assignment.description_text or ""
+                graph_manager.process_solution(
+                    assignment_id=solution.assignment_id,
+                    solution_uid=solution_uid,
+                    solution_text=solution.solution_text,
+                    solution_file_path=solution_file_path,
+                    final_answer=solution.final_answer,
+                    correct_answer=assignment.correct_answer,
+                    problem_text=problem_text
+                )
+        print(f"Processed {len(solutions)} existing solutions")
+    except Exception as e:
+        print(f"Error processing existing solutions: {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         migrate_database()
-    app.run(debug=True, host='0.0.0.0', port=5001)
+        # Process existing solutions on startup
+        process_existing_solutions()
+    
+    # Start the app
+    app.run(debug=True, host='0.0.0.0', port=5003)
