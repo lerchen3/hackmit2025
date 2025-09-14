@@ -14,7 +14,8 @@ def extract_last_boxed(latex_text: str) -> Optional[str]:
     if not latex_text:
         return None
 
-    search_token = "\\boxed{"  # literal backslash + boxed + opening brace
+    # Look specifically for the LaTeX token "\\boxed{" (backslash + boxed + opening brace)
+    search_token = "\\boxed{"
     last_extracted: Optional[str] = None
     i = 0
     n = len(latex_text)
@@ -52,12 +53,12 @@ def extract_last_boxed(latex_text: str) -> Optional[str]:
 def compute_default_out_path(input_path: str) -> str:
     base_dir, filename = os.path.split(os.path.abspath(input_path))
     name, _ = os.path.splitext(filename)
-    # Make it explicit that this CSV has answers extracted into Is_Correct column
+    # Make it explicit that this CSV has answers extracted
     return os.path.join(base_dir, f"{name}.answers.csv")
 
 
 def process_csv(inp: str, out: str) -> int:
-    """Read input CSV, replace Is_Correct with last \boxed{...} from Solution, write output CSV.
+    """Read input CSV, add Final_Answers = last \boxed{...} from Solution, write output CSV.
 
     Returns the number of rows written.
     """
@@ -67,10 +68,10 @@ def process_csv(inp: str, out: str) -> int:
         reader = csv.DictReader(fin)
         fieldnames_in: List[str] = reader.fieldnames or []
 
-        # Ensure we have expected columns; we will preserve all columns but overwrite Is_Correct
+        # Ensure we have expected columns; we will preserve all columns and add Final_Answers
         fieldnames_out: List[str] = list(fieldnames_in)
-        if "Is_Correct" not in fieldnames_out:
-            fieldnames_out.append("Is_Correct")
+        if "Final_Answers" not in fieldnames_out:
+            fieldnames_out.append("Final_Answers")
 
         with open(out, "w", encoding="utf-8", newline="") as fout:
             writer = csv.DictWriter(fout, fieldnames=fieldnames_out, extrasaction="ignore")
@@ -79,10 +80,9 @@ def process_csv(inp: str, out: str) -> int:
             for row in reader:
                 solution_text = row.get("Solution", "")
                 extracted = extract_last_boxed(solution_text) or ""
-                if(extracted != ""):
-                    row["Final_Answer"] = extracted
-                    writer.writerow(row)
-                    row_count += 1
+                row["Final_Answers"] = extracted
+                writer.writerow(row)
+                row_count += 1
 
     return row_count
 
@@ -97,14 +97,14 @@ def main() -> None:
     parser.add_argument(
         "--in",
         dest="inp",
-        default=os.path.abspath("/home/ubuntu/hackmit2025/synth/synthetic.csv"),
+        default=os.path.abspath("/home/ubuntu/hackmit2025/synth/bleh.csv"),
         help="Input CSV path (default: synth/synthetic.csv)",
     )
     parser.add_argument(
         "--out",
         dest="out",
         default=None,
-        help="Output CSV path (default: <input_stem>.answers.csv alongside input)",
+        help="Output CSV path (default: <input_stem>.csv alongside input)",
     )
     args = parser.parse_args()
 

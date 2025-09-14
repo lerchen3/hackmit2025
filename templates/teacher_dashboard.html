@@ -85,16 +85,6 @@
                         <i class="fas fa-users text-primary mr-2"></i>Students
                     </h3>
 
-                    <!-- Upload CSV -->
-                    <form class="mb-6" action="{{ url_for('upload_students_csv') }}" method="POST" enctype="multipart/form-data">
-                        <div class="flex items-center space-x-3">
-                            <input type="file" name="csv_file" accept=".csv" class="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-blue-700" required>
-                            <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                                <i class="fas fa-file-upload mr-2"></i>Upload CSV
-                            </button>
-                        </div>
-                        <p class="mt-2 text-xs text-gray-500">CSV must include a "student_id" column. Missing IDs will be auto-generated (quail_1, quail_2, ...).</p>
-                    </form>
                     
                     {% if students %}
                         <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">

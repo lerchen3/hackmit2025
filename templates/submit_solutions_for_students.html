@@ -29,6 +29,19 @@
                         <i class="fas fa-edit text-primary mr-2"></i>Student Solutions
                     </h3>
                     
+                    <!-- CSV Upload -->
+                    <div class="mb-6">
+                        <form method="POST" enctype="multipart/form-data">
+                            <div class="flex flex-col md:flex-row md:items-center md:space-x-3 space-y-3 md:space-y-0">
+                                <input id="solutions_csv" name="solutions_csv" type="file" accept=".csv" required class="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-blue-700">
+                                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    <i class="fas fa-file-upload mr-2"></i>Upload CSV
+                                </button>
+                            </div>
+                            <p class="mt-2 text-xs text-gray-500">CSV headers (case-insensitive): <code>student_id</code>, <code>Solution</code>, <code>Final_Answer</code>.</p>
+                        </form>
+                    </div>
+                    
                     <form method="POST" id="solutions-form">
                         <input type="hidden" id="solutions-data" name="solutions_data">
                         
@@ -156,32 +169,7 @@
                 </div>
             </div>
             
-            <!-- Help Section -->
-            <div class="bg-white shadow rounded-lg">
-                <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                        <i class="fas fa-question-circle text-primary mr-2"></i>Bulk Submission Guide
-                    </h3>
-                    <div class="space-y-3 text-sm text-gray-600">
-                        <div class="flex items-start">
-                            <i class="fas fa-check-square text-green-500 mr-2 mt-1"></i>
-                            <p>Check the boxes for students you want to submit solutions for.</p>
-                        </div>
-                        <div class="flex items-start">
-                            <i class="fas fa-edit text-blue-500 mr-2 mt-1"></i>
-                            <p>Provide solution text and final answers for each selected student.</p>
-                        </div>
-                        <div class="flex items-start">
-                            <i class="fas fa-save text-purple-500 mr-2 mt-1"></i>
-                            <p>Click "Submit All Solutions" to save all solutions at once.</p>
-                        </div>
-                        <div class="flex items-start">
-                            <i class="fas fa-chart-line text-orange-500 mr-2 mt-1"></i>
-                            <p>Solutions will be processed and included in the solution graph analysis.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
         </div>
     </div>
 </div>
