@@ -1,5 +1,5 @@
 # serve command:
-# vllm serve Qwen/Qwen3-8B --host 0.0.0.0 --port 8000 --dtype auto --max-model-len 8192 --api-key test-123
+# vllm serve Qwen/Qwen3-4B --host 0.0.0.0 --port 8000 --dtype auto --max-model-len 8192 --api-key test-123
 
 
 # run script: python3 test/inference.py

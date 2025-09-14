@@ -1,5 +1,5 @@
 from faiss import IndexFlatL2
-from openai import OpenAI
+import numpy as np
 from apimanager import APIManager
 
 class SolutionGraph:
@@ -8,39 +8,80 @@ class SolutionGraph:
     DISTANCE_THRESHOLD = 3072
     api_manager=APIManager("test_api_key")
     def __init__(self,problem_text,subject_domain="math"):
-        self.index = IndexFlatL2(EMBED_DIM)
+        self.index = IndexFlatL2(SolutionGraph.EMBED_DIM)
+        self.solution_index = IndexFlatL2(SolutionGraph.EMBED_DIM)
         self.problem_text = problem_text
-        self.index.add([100] * SolutionGraph.EMBED_DIM)
-        self.index.add([-100] * SolutionGraph.EMBED_DIM)
+        self.index.add(np.array([
+            [100.0] * SolutionGraph.EMBED_DIM,
+            [-100.0] * SolutionGraph.EMBED_DIM
+        ], dtype="float32"))
         self.stepSummary=["Read the problem statement", "Full Solution."]
         self.solutions=[]
         self.solution_is_correct=[]
         self.solution_uid_to_index={}
+        self.solution_texts=[]
         self.subject_domain=subject_domain
-        self.step_root=[]
+        self.step_root=[0,1]
     def formatStepSummaryQuery(self,step):
         return [{"role":"system","content":f"You are a helpful assistant who concisely and without unnecessary details summarizes the key ideas of the following step of a solution to a {self.subject_domain} problem."},{"role":"user","content":f"The step is as follows:\n{step}"}]
 
     def formatVerificationQuery(self,step1,step2):
         return [{"role":"system","content":f"You are a helpful assistant who checks whether the key ideas of certain texts are the exact same. Respond with a Yes or No."},{"role":"user","content":f"Both texts are steps of a solution to a {self.subject_domain} problem. The first text is as follows:\n{step1} The second text is as follows:\n{step2} Are they functionally the same?"}]
 
+    def formatSolutionDedupeQuery(self, sol1, sol2):
+        return [
+            {
+                "role": "system",
+                "content": """Fundamentally, are these two solutions the same? They need to use the all of the exact same ideas, the same technique, and the same means of execution.
+
+Don't overthink it! It should be obvious whether or not they're doing the same thing or not: Okay reasons are, say, \"Solution 1 uses length XY while solution 2 does not; no.\"
+
+Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too much or analyzing the solutions too much."""
+            },
+            {
+                "role": "user",
+                "content": f"Solution 1:\n{sol1}\n\nSolution 2:\n{sol2}\n\nAnswer with yes or no only."
+            }
+        ]
+
+    def is_duplicate_solution(self, new_solution_text):
+        if self.solution_index.ntotal == 0:
+            return (False, None)
+
+        emb = self.api_manager.embedText(new_solution_text)
+        if emb is None:
+            return (False, None)
+
+        q = np.array([emb], dtype="float32")
+        k = min(SolutionGraph.SEARCH_COUNT, self.solution_index.ntotal)
+        D, I = self.solution_index.search(q, k)
+        for cand_idx in I[0]:
+            cand_text = self.solution_texts[cand_idx]
+            resp = SolutionGraph.api_manager.query(self.formatSolutionDedupeQuery(new_solution_text, cand_text))
+            if resp is None:
+                continue
+            ans = resp.strip().lower()
+            if "yes" in ans:
+                return (True, cand_idx)
+        return (False, None)
+
     def getIndex(self, step):
         embed = self.api_manager.embedText(step)
         if embed is None:
             return None
-        embed_vector=embed.data[0]
+        embed_vector = np.array([embed], dtype="float32")
         distance, indices = self.index.search(embed_vector,SolutionGraph.SEARCH_COUNT)
         self.index.add(embed_vector)
         self.step_root.append(self.index.ntotal-1)
         for i in range(0,SolutionGraph.SEARCH_COUNT):
-            if distance[i] < SolutionGraph.DISTANCE_THRESHOLD:
+            if distance[0][i] < SolutionGraph.DISTANCE_THRESHOLD:
                 # Manually verify that they are same with LLM query
-                response=SolutionGraph.api_manager.query(self.formatVerificationQuery(step,self.stepSummary[indices[i]]))
+                response=SolutionGraph.api_manager.query(self.formatVerificationQuery(step,self.stepSummary[indices[0][i]]))
                 if response is None:
                     print("Failed to receive verification from API.")
                     continue
-                if response.choices[0].message.content.strip()[0]=="Y":
-                    ret = self.step_root[indices[i]]
+                if response.strip().lower().startswith("y"):
+                    ret = self.step_root[indices[0][i]]
                     self.step_root[-1] = ret
                     return ret
                     
@@ -48,10 +89,18 @@ class SolutionGraph:
         summary=self.api_manager.query(self.formatStepSummaryQuery(step));
         if summary is None:
             return None
-        self.stepSummary.append(summary.choices[0].message.content.strip())
+        self.stepSummary.append(summary.strip())
         return self.index.ntotal-1
 
     def addSolution(self, solution_uid,solution_text,is_correct):
+        # Solution-level dedupe first
+        is_dup, dup_idx = self.is_duplicate_solution(solution_text)
+        if is_dup:
+            self.solution_uid_to_index[solution_uid] = dup_idx
+            if is_correct and dup_idx < len(self.solution_is_correct) and not self.solution_is_correct[dup_idx]:
+                self.solution_is_correct[dup_idx] = True
+            return True
+
         response = self.api_manager.query([{"role": "system", "content": f"You are a helpful assistant who can break down solutions to mathematics problems into smaller steps."}, 
                                     {"role": "user", "content": f"One of my students was trying to solve the following problem:\n" 
                                                                 f"{self.problem_text}\n"
@@ -63,7 +112,7 @@ class SolutionGraph:
             print("Failed to receive step breakdown from API.")
             return False
         
-        steps = response.choices[0].message.content.split("###")[1:]
+        steps = response.split("###")[1:]
         stepIndices=[]
         for step in steps:
             step = step.strip()
@@ -78,6 +127,12 @@ class SolutionGraph:
         self.solutions.append(stepIndices)
         self.solution_uid_to_index[solution_uid]=len(self.solutions)-1
         self.solution_is_correct.append(is_correct)
+        
+        # Index this solution text for future dedupe
+        emb = self.api_manager.embedText(solution_text)
+        if emb is not None:
+            self.solution_index.add(np.array([emb], dtype="float32"))
+            self.solution_texts.append(solution_text)
         return True
     
     '''
@@ -119,7 +174,8 @@ class SolutionGraph:
         step_graph=[]
         for solution in self.solutions:
             for j in range(0,len(solution)):
-                found_prev = False, found_next= True
+                found_prev = False
+                found_next = False
                 for k in range(j-1,-1,-1):
                     if scc_indices[solution[j]] != scc_indices[solution[k]]:
                         step_graph.append((solution[k],solution[j]))
@@ -143,10 +199,10 @@ class SolutionGraph:
                     step_is_correct[j]=True
 
         # Prepare submissions data
-        for i in range(len(self.solutions)):
+        for uid, idx in self.solution_uid_to_index.items():
             submissions.append({
-                "submission_uid": list(self.solution_uid_to_index.keys())[i],
-                "submission_nodes": self.solutions[i]
+                "submission_uid": uid,
+                "submission_nodes": self.solutions[idx]
             })
         
         return {
