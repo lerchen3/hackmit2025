@@ -506,7 +506,7 @@ Keep the feedback concise but meaningful (2-3 paragraphs). Focus on being helpfu
             if api_manager:
                 llm_response = api_manager.query({
                     "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 500,
+                    "max_tokens": 1000,
                     "temperature": 0.7
                 })
             

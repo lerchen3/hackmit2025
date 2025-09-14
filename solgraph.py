@@ -25,47 +25,18 @@ Author: HackMIT 2025 Team
 from faiss import IndexFlatL2
 import numpy as np
 from apimanager import APIManager
+import os
+import json
 
 
 class SolutionGraph:
-    """
-    A class that maintains a directed acyclic graph (DAG) of solution steps for exam problems.
-    
-    This class uses vector embeddings and LLM verification to identify similar solution steps
-    across different submissions, creating a graph structure that shows the relationships
-    between different approaches to solving the same problem.
-    
-    Key Features:
-    - Semantic deduplication of solution steps using embeddings
-    - LLM-based verification of step similarity
-    - Graph generation with strongly connected components analysis
-    - Solution correctness tracking and propagation
-    """
-    
-    # Class constants for embedding and similarity search configuration
-    EMBED_DIM = 3072  # Dimension of the embedding vectors (matches API embedding model)
-    SEARCH_COUNT = 3  # Number of similar steps to retrieve during similarity search
-    DISTANCE_THRESHOLD = 3072  # Maximum distance threshold for considering steps as similar
-    api_manager = APIManager("bnxe")  # Shared API manager instance for all operations
-
-    def __init__(self, problem_text, subject_domain="math"):
-        """
-        Initialize a new SolutionGraph for a specific problem.
-        
-        Args:
-            problem_text (str): The text of the mathematical problem to be solved
-            subject_domain (str): The subject domain (default: "math") used in LLM prompts
-            
-        Initializes:
-            - FAISS indices for step and solution embeddings
-            - Data structures for tracking solutions, steps, and correctness
-            - Default start and end nodes for the solution graph
-        """
-        # Initialize FAISS indices for similarity search
-        self.index = IndexFlatL2(SolutionGraph.EMBED_DIM)  # Index for individual solution steps
-        self.solution_index = IndexFlatL2(SolutionGraph.EMBED_DIM)  # Index for complete solutions
-        
-        # Store the problem text and subject domain
+    EMBED_DIM = 3072
+    SEARCH_COUNT = 3
+    DISTANCE_THRESHOLD = 3072
+    api_manager=APIManager("bnxe")
+    def __init__(self,problem_text,subject_domain="math"):
+        self.index = IndexFlatL2(SolutionGraph.EMBED_DIM)
+        self.solution_index = IndexFlatL2(SolutionGraph.EMBED_DIM)
         self.problem_text = problem_text
         self.subject_domain = subject_domain
         
@@ -295,12 +266,9 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
                 self.solution_is_correct[dup_idx] = True
             return True
 
-        # Use LLM to break the solution into structured steps
-        response = self.api_manager.query(
-            [
-                {
-                    "role": "system",
-                    "content": r"""You are a solution explainer.
+        response = self.api_manager.query([
+    {"role": "system", "content": 
+r'''You are a solution explainer.
 
 Your task is to take a complete solution and reformat it into large, structured steps. Steps should be split before statements that change the course of the solution or require deep insight and a new idea.
 Do not add new reasoning or solve the problem yourself — just restructure what is already there.  
@@ -325,11 +293,7 @@ Formula: ...
 Reasoning: ...
 
 ...
-""",
-                },
-                {"role": "user", "content": solution_text},
-            ]
-        )
+'''}, {"role": "user", "content": solution_text}])
 
         if response is None:
             print("Failed to receive step breakdown from API.")
