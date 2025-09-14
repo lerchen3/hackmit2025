@@ -1,16 +1,19 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, Response, stream_with_context
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
+import csv
+import io
 import json
 from dotenv import load_dotenv
 import csv
 import time
 from graph_manager import graph_manager
 from apimanager import APIManager
+from event_bus import agent_event_bus
 
 # Load environment variables from .env file
 load_dotenv()
@@ -165,6 +168,8 @@ def teacher_dashboard():
     total_solutions = sum(len(assignment.solutions) for assignment in assignments)
     
     return render_template('teacher_dashboard.html', assignments=assignments, students=students, total_solutions=total_solutions)
+
+## Removed obsolete upload CSV route in favor of submit solutions CSV flow
 
 @app.route('/student/dashboard')
 @login_required
@@ -367,6 +372,51 @@ def view_solution_detail(solution_id):
     
     return render_template('solution_detail.html', solution=solution, assignment=assignment, student=student, feedback=feedback)
 
+@app.route('/teacher/agents', endpoint='agents_panel')
+@login_required
+def agents_panel():
+    if not current_user.is_teacher:
+        flash('Access denied', 'error')
+        return redirect(url_for('student_dashboard'))
+    return render_template('agents.html')
+
+@app.route('/events/agents', endpoint='events_agents')
+@login_required
+def events_agents():
+    if not current_user.is_teacher:
+        return jsonify({'error': 'Access denied'}), 403
+
+    def event_stream():
+        q = agent_event_bus.subscribe()
+        try:
+            # Initial comment to open stream
+            yield ': connected\n\n'
+            last_heartbeat = time.time()
+            while True:
+                try:
+                    evt = q.get(timeout=1.0)
+                    yield f"data: {json.dumps(evt)}\n\n"
+                except Exception:
+                    pass
+                # Heartbeat every 15s to keep connection alive
+                now = time.time()
+                if now - last_heartbeat > 15:
+                    yield ': heartbeat\n\n'
+                    last_heartbeat = now
+        finally:
+            try:
+                agent_event_bus.unsubscribe(q)
+            except Exception:
+                pass
+
+    headers = {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'X-Accel-Buffering': 'no',
+        'Connection': 'keep-alive',
+    }
+    return Response(stream_with_context(event_stream()), headers=headers)
+
 @app.route('/teacher/feedback/<int:assignment_id>/<int:student_id>', methods=['POST'])
 @login_required
 def submit_feedback(assignment_id, student_id):
@@ -546,53 +596,52 @@ def submit_solutions_for_students(assignment_id):
             # CSV upload path
             csv_file = request.files.get('solutions_csv')
             if csv_file and csv_file.filename:
-                # Optional explicit student_ids mapping; supports JSON list or comma-separated
-                raw_student_ids = request.form.get('student_ids')
-                mapped_students = []
-                if raw_student_ids:
-                    try:
-                        if raw_student_ids.strip().startswith('['):
-                            ids = json.loads(raw_student_ids)
-                        else:
-                            ids = [int(x) for x in raw_student_ids.split(',') if x.strip()]
-                        # Fetch students preserving provided order
-                        id_to_student = {u.id: u for u in User.query.filter(User.id.in_(ids)).all()}
-                        mapped_students = [id_to_student.get(i) for i in ids if i in id_to_student]
-                    except Exception:
-                        mapped_students = []
-                if not mapped_students:
-                    # Default: all non-teacher students sorted by username
-                    mapped_students = User.query.filter_by(is_teacher=False).order_by(User.username.asc()).all()
-
-                # Parse CSV
                 content = csv_file.read().decode('utf-8', errors='ignore')
                 reader = csv.DictReader(content.splitlines())
-                rows = list(reader)
-                if not rows:
+
+                # Validate CSV headers (case-insensitive)
+                if not reader.fieldnames:
                     flash('CSV appears empty.', 'error')
                     return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
-                missing_cols = [c for c in ["Solution", "Final_Answer"] if c not in reader.fieldnames]
-                if missing_cols:
-                    flash(f"CSV missing required columns: {', '.join(missing_cols)}", 'error')
+
+                normalized_headers = {h.strip().lower(): h for h in reader.fieldnames if h}
+                required_headers = {'student_id', 'solution', 'final_answer'}
+                missing = [h for h in required_headers if h not in normalized_headers]
+                if missing:
+                    missing_display = ', '.join(missing)
+                    flash(f"CSV missing required columns: {missing_display}", 'error')
                     return redirect(url_for('submit_solutions_for_students', assignment_id=assignment_id))
 
-                limit = min(len(rows), len(mapped_students))
-                if len(rows) != len(mapped_students):
-                    flash(f"Note: pairing first {limit} row(s) to {limit} student(s) by order.", 'warning')
+                created_users = 0
+                updated_solutions_count = 0
+                skipped_rows = 0
 
-                for idx in range(limit):
-                    row = rows[idx]
-                    student = mapped_students[idx]
-                    if not student:
+                for row in reader:
+                    student_id_str = (row.get(normalized_headers['student_id']) or '').strip()
+                    solution_text = (row.get(normalized_headers['solution']) or '').strip()
+                    final_answer = (row.get(normalized_headers['final_answer']) or '').strip()
+
+                    # Require student_id for this flow
+                    if not student_id_str:
+                        skipped_rows += 1
                         continue
-                    solution_text = (row.get('Solution') or '').strip()
-                    final_answer = (row.get('Final_Answer') or '').strip()
+
+                    # Skip rows that contain no content
                     if not solution_text and not final_answer:
                         continue
 
+                    # Ensure student exists (auto-create if missing)
+                    user = User.query.filter_by(username=student_id_str).first()
+                    if not user:
+                        user = User(username=student_id_str, password_hash=None, is_teacher=False)
+                        db.session.add(user)
+                        db.session.flush()
+                        created_users += 1
+
+                    # Create or update solution for this assignment and student
                     existing_solution = Solution.query.filter_by(
                         assignment_id=assignment_id,
-                        student_id=student.id
+                        student_id=user.id
                     ).first()
 
                     if existing_solution:
@@ -601,10 +650,11 @@ def submit_solutions_for_students(assignment_id):
                         existing_solution.submitted_at = datetime.utcnow()
                         db.session.commit()
                         created_solutions.append(existing_solution)
+                        updated_solutions_count += 1
                     else:
                         solution = Solution(
                             assignment_id=assignment_id,
-                            student_id=student.id,
+                            student_id=user.id,
                             solution_text=solution_text,
                             final_answer=final_answer
                         )
@@ -612,7 +662,7 @@ def submit_solutions_for_students(assignment_id):
                         db.session.commit()
                         created_solutions.append(solution)
 
-                    # 10ms delay between rows
+                    # 10ms delay between rows to simulate staggered submissions
                     time.sleep(0.01)
 
             else:
@@ -704,18 +754,17 @@ def get_solution_graph(assignment_id):
         graph_data = graph_manager.generate_graph(assignment_id)
         
         if graph_data is None:
-            print(f"No graph data found for assignment {assignment_id}")
-            # Check if there are any solutions for this assignment
-            solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
-            print(f"Found {len(solutions)} solutions for assignment {assignment_id}")
-            
-            # No solutions processed yet, return empty graph
-            return jsonify({
-                'graph': [],
-                'step_summary': ['Start', 'End'],
-                'step_is_correct': [True, True],
-                'submissions': []
-            })
+            # Build graph on-demand from DB state (handles multi-process debug server)
+            processed = process_solutions_for_assignment(assignment_id)
+            print(f"Graph not found in memory; processed {processed} solutions on-demand for assignment {assignment_id}")
+            graph_data = graph_manager.generate_graph(assignment_id)
+            if graph_data is None:
+                return jsonify({
+                    'graph': [],
+                    'step_summary': ['Start', 'End'],
+                    'step_is_correct': [True, True],
+                    'submissions': []
+                })
         
         print(f"Generated graph data for assignment {assignment_id}: {len(graph_data.get('submissions', []))} submissions")
         return jsonify(graph_data)
@@ -736,13 +785,16 @@ def get_solution_graph_tree(assignment_id):
         tree_data = graph_manager.generate_tree(assignment_id)
         
         if tree_data is None:
-            # No solutions processed yet, return empty tree
-            return jsonify({
-                'graph': [],
-                'step_summary': ['Start', 'End'],
-                'step_is_correct': [True, True],
-                'submissions': []
-            })
+            processed = process_solutions_for_assignment(assignment_id)
+            print(f"Tree not found in memory; processed {processed} solutions on-demand for assignment {assignment_id}")
+            tree_data = graph_manager.generate_tree(assignment_id)
+            if tree_data is None:
+                return jsonify({
+                    'graph': [],
+                    'step_summary': ['Start', 'End'],
+                    'step_is_correct': [True, True],
+                    'submissions': []
+                })
         
         return jsonify(tree_data)
     except Exception as e:
@@ -784,7 +836,10 @@ def process_existing_solutions():
                 if solution.solution_file:
                     solution_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'solutions', solution.solution_file)
                 
-                solution_uid = f"{solution.student.username}_{solution.id}"
+                # Ensure username is available
+                student = User.query.get(solution.student_id)
+                username = student.username if student else f"student_{solution.student_id}"
+                solution_uid = f"{username}_{solution.id}"
                 problem_text = assignment.description_text or ""
                 graph_manager.process_solution(
                     assignment_id=solution.assignment_id,
@@ -800,6 +855,40 @@ def process_existing_solutions():
         print(f"Processed {len(solutions)} existing solutions")
     except Exception as e:
         print(f"Error processing existing solutions: {e}")
+
+def process_solutions_for_assignment(assignment_id: int):
+    """Process all solutions for a specific assignment using DB state."""
+    try:
+        assignment = Assignment.query.get(assignment_id)
+        if not assignment:
+            return 0
+        solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
+        processed = 0
+        for solution in solutions:
+            solution_file_path = None
+            if solution.solution_file:
+                solution_file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'solutions', solution.solution_file)
+
+            student = User.query.get(solution.student_id)
+            username = student.username if student else f"student_{solution.student_id}"
+            solution_uid = f"{username}_{solution.id}"
+            problem_text = assignment.description_text or ""
+
+            ok = graph_manager.process_solution(
+                assignment_id=assignment_id,
+                solution_uid=solution_uid,
+                solution_text=solution.solution_text,
+                solution_file_path=solution_file_path,
+                final_answer=solution.final_answer,
+                correct_answer=assignment.correct_answer,
+                problem_text=problem_text
+            )
+            if ok:
+                processed += 1
+        return processed
+    except Exception as e:
+        print(f"Error processing solutions for assignment {assignment_id}: {e}")
+        return 0
 
 if __name__ == '__main__':
     with app.app_context():

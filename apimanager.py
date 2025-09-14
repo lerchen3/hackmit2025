@@ -2,6 +2,9 @@ from openai import OpenAI
 import os
 import json
 import re
+import time
+import uuid
+from event_bus import agent_event_bus
 
 class APIManager:
     ATTEMPTS = 3
@@ -72,6 +75,31 @@ class APIManager:
                     if self.prompt_type == "concise" and "messages" in payload:
                         payload["messages"] = self._apply_concise_hint(payload["messages"]) 
 
+                # Publish start event to Agents panel
+                try:
+                    req_id = f"ag_{uuid.uuid4().hex}"
+                    model_name = None
+                    if isinstance(payload, dict):
+                        model_name = payload.get("model")
+                    preview = None
+                    if isinstance(payload, dict):
+                        msgs = payload.get("messages")
+                        if isinstance(msgs, list) and len(msgs) > 0 and isinstance(msgs[-1], dict):
+                            preview = msgs[-1].get("content")
+                            if isinstance(preview, str) and len(preview) > 200:
+                                preview = preview[:200] + "…"
+                    agent_event_bus.publish({
+                        "kind": "llm",
+                        "status": "started",
+                        "id": req_id,
+                        "provider": provider,
+                        "model": model_name,
+                        "ts": time.time(),
+                        "preview": preview,
+                    })
+                except Exception:
+                    req_id = f"ag_{uuid.uuid4().hex}"
+
                 if provider == "local":
                     resp = self.vllm.chat.completions.create(**payload)
                 elif provider == "openai":
@@ -95,8 +123,38 @@ class APIManager:
                     if counts is not None:
                         print(f"[{provider}] tokens prompt={counts['prompt']} completion={counts['completion']} total={counts['total']}")
 
+                # Publish chunk and finished events
+                try:
+                    agent_event_bus.publish({
+                        "kind": "llm",
+                        "status": "chunk",
+                        "id": req_id,
+                        "ts": time.time(),
+                        "content": text,
+                    })
+                    counts = self.get_last_token_counts()
+                    agent_event_bus.publish({
+                        "kind": "llm",
+                        "status": "finished",
+                        "id": req_id,
+                        "ts": time.time(),
+                        "usage": counts,
+                    })
+                except Exception:
+                    pass
+
                 return text
             except Exception as e:
+                try:
+                    agent_event_bus.publish({
+                        "kind": "llm",
+                        "status": "error",
+                        "id": req_id if 'req_id' in locals() else f"ag_{uuid.uuid4().hex}",
+                        "ts": time.time(),
+                        "error": str(e),
+                    })
+                except Exception:
+                    pass
                 print(f"Error querying API: {str(e)}. Attempt {i+1} of {APIManager.ATTEMPTS}")
         print(f"Failed to query API after {APIManager.ATTEMPTS} attempts.")
         return None
@@ -133,6 +191,29 @@ class APIManager:
         self.last_usage = None
 
         try:
+            req_id = f"ag_{uuid.uuid4().hex}"
+            model_name = payload.get("model") if isinstance(payload, dict) else None
+            preview = None
+            try:
+                msgs = payload.get("messages") if isinstance(payload, dict) else None
+                if isinstance(msgs, list) and len(msgs) > 0 and isinstance(msgs[-1], dict):
+                    preview = msgs[-1].get("content")
+                    if isinstance(preview, str) and len(preview) > 200:
+                        preview = preview[:200] + "…"
+            except Exception:
+                pass
+            try:
+                agent_event_bus.publish({
+                    "kind": "llm",
+                    "status": "started",
+                    "id": req_id,
+                    "provider": provider,
+                    "model": model_name,
+                    "ts": time.time(),
+                    "preview": preview,
+                })
+            except Exception:
+                pass
             if provider == "local":
                 resp_stream = self.vllm.chat.completions.create(**payload)
             elif provider == "openai":
@@ -146,6 +227,16 @@ class APIManager:
                     delta = chunk.choices[0].delta
                     content = getattr(delta, "content", None)
                     if content:
+                        try:
+                            agent_event_bus.publish({
+                                "kind": "llm",
+                                "status": "chunk",
+                                "id": req_id,
+                                "ts": time.time(),
+                                "content": content,
+                            })
+                        except Exception:
+                            pass
                         yield content
                     # Capture usage if the SDK provides it during the final event
                     usage = getattr(chunk, "usage", None)
@@ -160,8 +251,30 @@ class APIManager:
                 counts = self.get_last_token_counts()
                 if counts is not None:
                     print(f"[{provider}] tokens prompt={counts['prompt']} completion={counts['completion']} total={counts['total']}")
+            # Publish finished
+            try:
+                counts = self.get_last_token_counts()
+                agent_event_bus.publish({
+                    "kind": "llm",
+                    "status": "finished",
+                    "id": req_id,
+                    "ts": time.time(),
+                    "usage": counts,
+                })
+            except Exception:
+                pass
         except Exception as e:
             print(f"Error streaming API: {str(e)}")
+            try:
+                agent_event_bus.publish({
+                    "kind": "llm",
+                    "status": "error",
+                    "id": req_id if 'req_id' in locals() else f"ag_{uuid.uuid4().hex}",
+                    "ts": time.time(),
+                    "error": str(e),
+                })
+            except Exception:
+                pass
 
     # --- Config and prompt utilities ---
     def _load_config(self):

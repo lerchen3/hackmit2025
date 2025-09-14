@@ -19,6 +19,9 @@
             <a href="{{ url_for('create_assignment') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                 <i class="fas fa-plus mr-2"></i>Create Assignment
             </a>
+            <a href="{{ url_for('agents_panel') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                <i class="fas fa-robot mr-2"></i>Agents
+            </a>
         </div>
     </div>
 
@@ -84,6 +87,7 @@
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
                         <i class="fas fa-users text-primary mr-2"></i>Students
                     </h3>
+
                     
                     {% if students %}
                         <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
