@@ -70,20 +70,28 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
         if embed is None:
             return None
         embed_vector = np.array([embed], dtype="float32")
-        distance, indices = self.index.search(embed_vector,SolutionGraph.SEARCH_COUNT)
+        distance, indices = self.index.search(embed_vector,min(self.index.ntotal,SolutionGraph.SEARCH_COUNT))
         self.index.add(embed_vector)
-        self.step_root.append(self.index.ntotal-1)
-        for i in range(0,SolutionGraph.SEARCH_COUNT):
-            if distance[0][i] < SolutionGraph.DISTANCE_THRESHOLD:
+        curi = self.index.ntotal-1
+        self.step_root.append(curi)
+        
+        # Convert indices to step_root references (FAISS returns 2D arrays)
+        for i in range(0, len(indices[0])):
+            if indices[0][i] < len(self.step_root):
+                indices[0][i] = self.step_root[indices[0][i]]
+        
+        for i in range(0, len(indices[0])):
+            if i < len(distance[0]) and distance[0][i] < SolutionGraph.DISTANCE_THRESHOLD:
                 # Manually verify that they are same with LLM query
-                response=SolutionGraph.api_manager.query(self.formatVerificationQuery(step,self.stepSummary[indices[0][i]]))
-                if response is None:
-                    print("Failed to receive verification from API.")
-                    continue
-                if response.strip().lower().startswith("y"):
-                    ret = self.step_root[indices[0][i]]
-                    self.step_root[-1] = ret
-                    return ret
+                if indices[0][i] < len(self.stepSummary):
+                    response=SolutionGraph.api_manager.query(self.formatVerificationQuery(step,self.stepSummary[indices[0][i]]))
+                    if response is None:
+                        print("Failed to receive verification from API.")
+                        continue
+                    if response.strip().lower().startswith("y"):
+                        ret = indices[0][i]
+                        self.step_root[curi] = ret
+                        return ret
                     
         # No match found, generate new index + a summary of the step
         summary=self.api_manager.query(self.formatStepSummaryQuery(step));
@@ -206,7 +214,7 @@ Return one word: \"yes\" or \"no\", nothing else. I forbid you from thinking too
             })
         
         return {
-            "graph": graph, 
+            "graph": step_graph, 
             "step_summary": self.stepSummary, 
             "step_is_correct": step_is_correct,
             "submissions": submissions
@@ -329,12 +337,12 @@ class SolutionTree:
                 self.numNodes += 1
                 break
             if len(cur_node.children) > 0:
-                query_string += "Here is the list of category next steps:\n"
+                query_string = "Here is the list of category next steps:\n"
                 for i in range(0,len(cur_node.children)):
                     query_string += "Category "+str(i+1)+": \n"+cur_node.children[i].parent_summary+"\n"
 
                 query_string += "\n"
-                query_string="Match the following solution:\n"+solution_text+"\n\n"
+                query_string += "Match the following solution:\n"+solution_text+"\n\n"
 
                 response = SolutionTree.api_manager.query([{"role":"system","content":r"You are given a list of category next steps and a user's solution. Find the one that most matches the user's solution. Respond with only the index of the most similar category in the following format:\n ### [Index]"},{"role":"user","content":query_string}])
                 if response is None:
@@ -370,8 +378,8 @@ class SolutionTree:
             solution_text=unshared2
             if solution_text == "":
                 break
-        node_list.append(cur_node)
-        if cur_node.is_correct:
+        nodeList.append(cur_node)
+        if is_correct:
             cur_node.is_correct=True
             for node in reversed(nodeList):
                 node.pull_correctness()
