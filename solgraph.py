@@ -1,7 +1,7 @@
 """
 SolutionGraph Module
 
-This module provides two main classes for analyzing and organizing mathematical solution steps:
+This module provides two main classes for analyzing and organizing mathematical (or any technical subject) solution steps:
 1. SolutionGraph: Creates a directed acyclic graph (DAG) of solution steps using embeddings
 2. SolutionTree: Creates a tree structure of solution steps using LLM-based similarity matching
 
@@ -735,7 +735,7 @@ class SolutionTree:
                     [
                         {
                             "role": "system",
-                            "content": f"You will be given a solution to a math problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string.",
+                            "content": f"You will be given a solution to a {self.subject_domain} problem, as well as an incomplete prefix of that solution. Task: Find the part of the complete solution not included in the incomplete prefix. Respond with only the unshared part. If no part exists, respond with an empty string.",
                         },
                         {
                             "role": "user",
@@ -765,8 +765,6 @@ class SolutionTree:
                     cur_node.children[-1].children.append(cur_node.children[res])
                     cur_node.children[res].parent_summary = unshared1
                     
-                    cur_node.children[-1].pull_correctness()
-                    
                     # Swap positions and remove the old reference
                     cur_node.children[-1], cur_node.children[res] = (
                         cur_node.children[res],
@@ -774,6 +772,7 @@ class SolutionTree:
                     )
                     cur_node.children.pop()
                     cur_node = cur_node.children[res]  # Move to the shared node
+                    nodeList.append(cur_node)
                 
                 # Add the new solution as a sibling to the existing child
                 cur_node.children.append(self.Node(unshared2, self.numNodes))
