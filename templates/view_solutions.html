@@ -174,9 +174,19 @@
                 <h3 class="text-lg font-medium text-gray-900">
                     <i class="fas fa-project-diagram text-primary mr-2"></i>Solution Graph Analysis
                 </h3>
-                <button onclick="closeGraph()" class="text-gray-300 hover:text-gray-500 bg-transparent hover:bg-gray-100 w-8 h-8 rounded text-xl font-light flex items-center justify-center">
-                    ×
-                </button>
+                <div class="flex items-center space-x-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-gray-600">Switch layout to </span>
+                        <button id="layout-toggle" 
+                                onclick="toggleLayout()" 
+                                class="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
+                            Tree
+                        </button>
+                    </div>
+                    <button onclick="closeGraph()" class="text-gray-300 hover:text-gray-500 bg-transparent hover:bg-gray-100 w-8 h-8 rounded text-xl font-light flex items-center justify-center">
+                        ×
+                    </button>
+                </div>
             </div>
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div class="lg:col-span-1">
@@ -300,8 +310,8 @@ function loadGraphData() {
             // Store graph data globally for multi-student highlighting
             window.graphData = data;
             
-            // Initialize the graph
-            highlightFunction = initializeGraph('graph-container', data);
+            // Initialize the graph with DAG layout
+            highlightFunction = initializeGraph('graph-container', data, 'dag');
         })
         .catch(error => {
             console.error('Error loading graph:', error);
@@ -531,5 +541,117 @@ updateHighlighting = function() {
 
 // Initialize feedback button state
 updateFeedbackButton();
+
+// Layout toggle functionality
+let currentLayout = 'dag'; // 'dag' or 'tree'
+let currentGraphData = null;
+
+function toggleLayout() {
+    const toggleBtn = document.getElementById('layout-toggle');
+    
+    if (currentLayout === 'dag') {
+        // Switch to tree layout
+        currentLayout = 'tree';
+        toggleBtn.textContent = 'DAG';
+        loadTreeLayout();
+    } else {
+        // Switch to DAG layout
+        currentLayout = 'dag';
+        toggleBtn.textContent = 'Tree';
+        loadDAGLayout();
+    }
+}
+
+function loadTreeLayout() {
+    console.log('Loading tree layout...');
+    const container = document.getElementById('graph-container');
+    container.innerHTML = '<div class="flex flex-col items-center justify-center h-96"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div><p class="mt-4 text-gray-600">Loading tree layout...</p></div>';
+    
+    // Store current student selection before switching layouts
+    const currentSelection = Array.from(document.querySelectorAll('#student-list input[type="checkbox"]:checked'))
+        .map(checkbox => checkbox.value.split('_').slice(0, 2).join('_'));
+    
+    fetch(`/api/solution-graph-tree/{{ assignment.id }}`)
+        .then(response => {
+            console.log('Tree layout response:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Tree layout data received:', data);
+            currentGraphData = data;
+            window.graphData = data;
+            
+            // Initialize the graph with tree layout
+            console.log('Initializing tree graph...');
+            highlightFunction = initializeGraph('graph-container', data, 'tree');
+            console.log('Tree graph initialized');
+            
+            // Re-apply highlighting based on current selection
+            setTimeout(() => {
+                if (currentSelection.length === 0) {
+                    highlightFunction(null);
+                } else if (currentSelection.length === 1) {
+                    highlightFunction(currentSelection[0]);
+                } else {
+                    highlightMultipleSubmissions(currentSelection);
+                }
+            }, 100); // Small delay to ensure graph is fully rendered
+        })
+        .catch(error => {
+            console.error('Error loading tree layout:', error);
+            const container = document.getElementById('graph-container');
+            container.innerHTML = 
+                '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">' + error.message + '</p></div></div></div>';
+        });
+}
+
+function loadDAGLayout() {
+    console.log('Loading DAG layout...');
+    const container = document.getElementById('graph-container');
+    container.innerHTML = '<div class="flex flex-col items-center justify-center h-96"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div><p class="mt-4 text-gray-600">Loading DAG layout...</p></div>';
+    
+    // Store current student selection before switching layouts
+    const currentSelection = Array.from(document.querySelectorAll('#student-list input[type="checkbox"]:checked'))
+        .map(checkbox => checkbox.value.split('_').slice(0, 2).join('_'));
+    
+    fetch(`/api/solution-graph/{{ assignment.id }}`)
+        .then(response => {
+            console.log('DAG layout response:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('DAG layout data received:', data);
+            currentGraphData = data;
+            window.graphData = data;
+            
+            // Initialize the graph with DAG layout
+            console.log('Initializing DAG graph...');
+            highlightFunction = initializeGraph('graph-container', data, 'dag');
+            console.log('DAG graph initialized');
+            
+            // Re-apply highlighting based on current selection
+            setTimeout(() => {
+                if (currentSelection.length === 0) {
+                    highlightFunction(null);
+                } else if (currentSelection.length === 1) {
+                    highlightFunction(currentSelection[0]);
+                } else {
+                    highlightMultipleSubmissions(currentSelection);
+                }
+            }, 100); // Small delay to ensure graph is fully rendered
+        })
+        .catch(error => {
+            console.error('Error loading DAG layout:', error);
+            const container = document.getElementById('graph-container');
+            container.innerHTML = 
+                '<div class="bg-red-50 border border-red-200 rounded-md p-4"><div class="flex"><div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div><div class="ml-3"><p class="text-sm text-red-700">' + error.message + '</p></div></div></div>';
+        });
+}
 </script>
 {% endblock %}

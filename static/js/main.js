@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Graph visualization functions
-function initializeGraph(containerId, graphData) {
+function initializeGraph(containerId, graphData, layoutType = 'dag') {
     const container = document.getElementById(containerId);
     if (!container) return;
     
@@ -104,7 +104,8 @@ function initializeGraph(containerId, graphData) {
         return;
     }
 
-    // Create SVG
+    // Clear container and create SVG
+    container.innerHTML = '';
     const svg = d3.select(container)
         .append('svg')
         .attr('width', '100%')
@@ -177,16 +178,91 @@ function initializeGraph(containerId, graphData) {
         return levels;
     };
     
-    const levels = createHierarchicalLayout(nodeIds, edges);
-    const maxLevel = Math.max(...levels.keys());
+    let levels, maxLevel, nodeLevels;
     
+    if (layoutType === 'tree') {
+        console.log('Creating tree layout...');
+        // For tree layout, create a proper depth-ordered structure
+        levels = new Map();
+        levels.set(0, [0]); // Root at level 0 (top)
+        
+        // Group nodes by their distance from root using BFS
+        nodeLevels = new Map();
+        nodeLevels.set(0, 0); // Root is at level 0 (top)
+        
+        // BFS to assign levels - process level by level to ensure proper depth ordering
+        let currentLevel = 0;
+        let currentLevelNodes = [0];
+        const visited = new Set([0]);
+        
+        while (currentLevelNodes.length > 0) {
+            const nextLevelNodes = [];
+            
+            // Process all nodes at current level
+            for (const currentNode of currentLevelNodes) {
+                // Find children of current node
+                const children = edges
+                    .filter(edge => edge.source === currentNode)
+                    .map(edge => edge.target)
+                    .filter(child => !visited.has(child));
+                
+                // Add children to next level
+                children.forEach(child => {
+                    if (!visited.has(child)) {
+                        const nextLevel = currentLevel + 1;
+                        nodeLevels.set(child, nextLevel);
+                        
+                        if (!levels.has(nextLevel)) {
+                            levels.set(nextLevel, []);
+                        }
+                        levels.get(nextLevel).push(child);
+                        nextLevelNodes.push(child);
+                        visited.add(child);
+                    }
+                });
+            }
+            
+            // Move to next level
+            currentLevelNodes = nextLevelNodes;
+            currentLevel++;
+        }
+        
+        // Add any unvisited nodes to the last level
+        const unvisitedNodes = nodeIds.filter(id => !visited.has(id));
+        if (unvisitedNodes.length > 0) {
+            const lastLevel = Math.max(...levels.keys()) + 1;
+            levels.set(lastLevel, unvisitedNodes);
+            unvisitedNodes.forEach(node => {
+                nodeLevels.set(node, lastLevel);
+            });
+        }
+        
+        maxLevel = Math.max(...levels.keys());
+        console.log('Tree layout levels (depth-ordered):', levels);
+        console.log('Max level:', maxLevel);
+    } else {
+        console.log('Creating DAG layout...');
+        // For DAG layout, use the existing hierarchical layout
+        levels = createHierarchicalLayout(nodeIds, edges);
+        maxLevel = Math.max(...levels.keys());
+        nodeLevels = new Map(); // Initialize empty for DAG layout
+        console.log('DAG layout levels:', levels);
+        console.log('Max level:', maxLevel);
+    }
+    
+    console.log('Creating nodes...');
     const nodes = nodeIds.map((id) => {
-        // Find which level this node belongs to
+        // Find which level this node belongs to - use nodeLevels map for accuracy
         let level = 0;
-        for (const [levelNum, levelNodes] of levels.entries()) {
-            if (levelNodes.includes(id)) {
-                level = levelNum;
-                break;
+        if (layoutType === 'tree' && nodeLevels.has(id)) {
+            level = nodeLevels.get(id);
+        } else {
+            // Fallback: search through levels map
+            for (const [levelNum, levelNodes] of levels.entries()) {
+                if (levelNodes.includes(id)) {
+                    level = levelNum;
+                    break;
+                }
             }
         }
         
@@ -201,31 +277,58 @@ function initializeGraph(containerId, graphData) {
         const centerX = 400; // Center of the SVG
         const centerY = 250;
         
-        // Determine node type
-        const nodeType = id === 0 ? 'start' : id === nodeIds[nodeIds.length - 1] ? 'end' : 'process';
+        // Determine node type based on layout type
+        let nodeType;
+        if (id === 0) {
+            nodeType = 'start'; // Start node is always special
+        } else if (layoutType === 'dag' && id === nodeIds[nodeIds.length - 1]) {
+            nodeType = 'end'; // Last node is end node for DAG layout
+        } else {
+            nodeType = 'process'; // All other nodes are process nodes
+        }
         
         // Special positioning for start and end nodes
         let x, y;
-        if (nodeType === 'start') {
-            // Start node always on the left
-            x = 100;
-            y = centerY;
-        } else if (nodeType === 'end') {
-            // End node always on the right
-            x = 700;
-            y = centerY;
-        } else {
-            // Process nodes positioned within their level
-            // Horizontal positioning based on level (closer to start = more left)
-            const levelSpacing = 600 / Math.max(1, maxLevel + 1); // Total width divided by levels
-            x = 100 + (level * levelSpacing); // Start at 100, move right by level
-            
-            // Vertical positioning within level for symmetry
-            if (totalInLevel === 1) {
-                y = centerY; // Center single nodes
+        if (layoutType === 'tree') {
+            // Tree layout: depth-ordered positioning from top to bottom
+            if (nodeType === 'start') {
+                // Root node at the very top
+                x = centerX;
+                y = 30;
             } else {
-                const verticalSpacing = levelHeight / (totalInLevel + 1);
-                y = centerY - (levelHeight / 2) + (nodeIndex + 1) * verticalSpacing;
+                // All other nodes positioned by depth level
+                const totalHeight = 450; // Total available height
+                const levelSpacing = totalHeight / Math.max(1, maxLevel + 1); // Even spacing between levels
+                
+                // Position horizontally within level for symmetry
+                x = centerX + (nodeIndex - totalInLevel/2) * 180; // Spread horizontally within level
+                
+                // Position vertically based on depth (level 0 = top, higher levels = lower)
+                y = 30 + (level * levelSpacing);
+            }
+        } else {
+            // DAG layout: original left-to-right positioning
+            if (nodeType === 'start') {
+                // Start node always on the left
+                x = 100;
+                y = centerY;
+            } else if (nodeType === 'end') {
+                // End node always on the right
+                x = 700;
+                y = centerY;
+            } else {
+                // Process nodes positioned within their level
+                // Horizontal positioning based on level (closer to start = more left)
+                const levelSpacing = 600 / Math.max(1, maxLevel + 1); // Total width divided by levels
+                x = 100 + (level * levelSpacing); // Start at 100, move right by level
+                
+                // Vertical positioning within level for symmetry
+                if (totalInLevel === 1) {
+                    y = centerY; // Center single nodes
+                } else {
+                    const verticalSpacing = levelHeight / (totalInLevel + 1);
+                    y = centerY - (levelHeight / 2) + (nodeIndex + 1) * verticalSpacing;
+                }
             }
         }
         
@@ -247,6 +350,9 @@ function initializeGraph(containerId, graphData) {
         
         return node;
     });
+
+    console.log('Nodes created:', nodes.length);
+    console.log('Sample node:', nodes[0]);
 
     // Create simulation with improved symmetry
     const simulation = d3.forceSimulation(nodes)
@@ -319,8 +425,7 @@ function initializeGraph(containerId, graphData) {
     node.append('circle')
         .attr('r', 20)
         .attr('fill', d => {
-            if (d.type === 'start') return '#ffffff';
-            if (d.type === 'end') return '#ffffff';
+            if (d.type === 'start' || d.type === 'end') return '#ffffff';
             if (d.type === 'process') {
                 return d.is_correct ? '#333333' : '#666666';
             }
@@ -430,14 +535,14 @@ function initializeGraph(containerId, graphData) {
                 .attr('r', 20);
         });
 
-    // Add labels to nodes (only visible for start/end nodes)
+    // Add labels to nodes (visible for start and end nodes)
     node.append('text')
         .attr('text-anchor', 'middle')
         .attr('dy', '.35em')
         .attr('fill', d => (d.type === 'start' || d.type === 'end') ? '#000000' : 'white')
         .attr('font-size', '12px')
         .attr('font-weight', 'bold')
-        .attr('opacity', d => d.type === 'start' || d.type === 'end' ? 1 : 0)
+        .attr('opacity', d => (d.type === 'start' || d.type === 'end') ? 1 : 0)
         .text(d => d.label);
 
     // Create tooltip groups for process nodes
@@ -490,7 +595,7 @@ function initializeGraph(containerId, graphData) {
         
         // Don't allow dragging of fixed nodes
         if (d.fx !== undefined && d.fy !== undefined) {
-            return; // Prevent dragging of start/end nodes
+            return; // Prevent dragging of start and end nodes
         }
         
         d.fx = d.x;
@@ -503,7 +608,7 @@ function initializeGraph(containerId, graphData) {
     function dragged(event, d) {
         // Don't allow dragging of fixed nodes
         if (d.fx !== undefined && d.fy !== undefined) {
-            return; // Prevent dragging of start/end nodes
+            return; // Prevent dragging of start and end nodes
         }
         
         // Mark that we're dragging
@@ -519,7 +624,7 @@ function initializeGraph(containerId, graphData) {
         
         // Don't allow dragging of fixed nodes
         if (d.fx !== undefined && d.fy !== undefined) {
-            return; // Prevent dragging of start/end nodes
+            return; // Prevent dragging of start and end nodes
         }
         
         // Allow process nodes to settle naturally
@@ -537,12 +642,11 @@ function initializeGraph(containerId, graphData) {
         // Reset all nodes and links first
         node.select('circle').attr('stroke', d => {
             // Start and end nodes should have black outline, process nodes white
-            return d.type === 'start' || d.type === 'end' ? '#000000' : '#fff';
+            return (d.type === 'start' || d.type === 'end') ? '#000000' : '#fff';
         }).attr('stroke-width', 2)
         .attr('fill', d => {
             // Restore original fill colors
-            if (d.type === 'start') return '#ffffff';
-            if (d.type === 'end') return '#ffffff';
+            if (d.type === 'start' || d.type === 'end') return '#ffffff';
             if (d.type === 'process') {
                 return d.is_correct ? '#333333' : '#666666';
             }
@@ -643,6 +747,8 @@ function initializeGraph(containerId, graphData) {
     // Make selectStudentsUsingStep available globally
     window.selectStudentsUsingStep = selectStudentsUsingStep;
 
+    console.log('Graph initialization completed successfully');
+    
     // Return highlight function for external use
     return highlightStudentPath;
 }

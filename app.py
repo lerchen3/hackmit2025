@@ -423,6 +423,58 @@ def get_solution_graph(assignment_id):
     
     return jsonify(graph_data)
 
+@app.route('/api/solution-graph-tree/<int:assignment_id>')
+@login_required
+def get_solution_graph_tree(assignment_id):
+    if not current_user.is_teacher:
+        return jsonify({'error': 'Access denied'}), 403
+    
+    # This is a placeholder for the tree graph generation
+    # In a real implementation, you would analyze the solutions and generate a tree graph
+    solutions = Solution.query.filter_by(assignment_id=assignment_id).all()
+    
+    # Generate tree graph data with hierarchical structure
+    graph_data = {
+        'graph': [
+            {'from': 0, 'to': 1},
+            {'from': 0, 'to': 2},
+            {'from': 1, 'to': 3},
+            {'from': 1, 'to': 4},
+            {'from': 2, 'to': 5},
+            {'from': 2, 'to': 6}
+        ],
+        'step_summary': [
+            'Start',                    # step 0 - root
+            'Method A',                 # step 1 - level 1
+            'Method B',                 # step 2 - level 1
+            'Sub-method A1',           # step 3 - level 2
+            'Sub-method A2',           # step 4 - level 2
+            'Sub-method B1',           # step 5 - level 2
+            'Final Step'               # step 6 - level 2 (now a regular process node)
+        ],
+        'step_is_correct': [
+            True,   # step 0
+            True,   # step 1
+            True,   # step 2
+            True,   # step 3
+            True,   # step 4
+            True,   # step 5
+            True,   # step 6
+        ],
+        'submissions': [
+            {
+                'submission_uid': 'student1_1',
+                'submission_nodes': [0, 1, 3, 6]  # Path through Method A -> Sub-method A1 -> Final Step
+            },
+            {
+                'submission_uid': 'student2_2',
+                'submission_nodes': [0, 2, 5, 6]  # Path through Method B -> Sub-method B1 -> Final Step
+            }
+        ]
+    }
+    
+    return jsonify(graph_data)
+
 # Database migration function
 def migrate_database():
     """Add final_answer column to Solution table if it doesn't exist"""
