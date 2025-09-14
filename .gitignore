@@ -1,3 +1,4 @@
 env/
 instance/
 uploads/
+__pycache__/
