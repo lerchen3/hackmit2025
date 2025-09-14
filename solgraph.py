@@ -204,4 +204,51 @@ class SolutionGraph:
         
         return sccs
                 
-                
+class SolutionTree:
+    class Node:
+        def __init__(self, step_text):
+            self.children = [] # Child
+            self.parent = None
+            if step_text is not None:
+                self.parent_summary = step_text
+                self.parent_embed = api_manager.embedText(step_text)
+
+    api_manager=APIManager("test_api_key")
+    def __init__(self, problem_text, subject_domain="math"):
+        self.problem_text = problem_text
+        self.subject_domain = subject_domain
+        self.root = self.Node(None)
+    
+    def generateTree(self):
+        return self.solution_graph.generateGraph()
+    
+    def addSolution(self, solution_uid, solution_text, is_correct):
+        cur_node = self.root
+        while True:
+            # Find most similar child node
+            query_string="Match the following solution:\n"+solution_text+"\n\n"
+            query_string += "To the following list of next steps:\n"
+            for child in cur_node.children:
+                query_string += child.parent_summary+"\n"
+
+            SolutionTree.api_manager.query([{"role":"system","content":r"You are a helpful assistant who tries to find, out of a list of next steps, the one that most matches the user's solution. Respond with only the index of the most similar step."}])
+            
+            res = ;
+
+            shared=""
+            unshared=solution_text
+            if res != "No Matches Found":
+                response = SolutionTree.api_manager.query([{"role":}]) # Compute lca
+                shared,unshared=response.split("#####")
+            shared = shared.strip()
+            unshared = unshared.strip()
+            # Add new node
+            if shared != "":
+                cur_node.children.append(self.Node(solution_text))
+                cur_node.children[-1],cur_node.children[sol_id] = cur_node.children[sol_id],cur_node.children[-1]
+                sol_id = len(cur_node.children)-1
+                intermediate_node = self.Node(shared)
+                intermediate_node.children.append(cur_node.children[sol_id])
+                intermediate_node.children.append(self.Node(unshared))
+            
+
