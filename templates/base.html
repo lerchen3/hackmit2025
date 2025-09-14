@@ -37,61 +37,111 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <nav class="bg-primary shadow-lg">
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <a href="{{ url_for('index') }}" class="text-white text-xl font-bold flex items-center">
-                            <i class="fas fa-graduation-cap mr-2"></i>Assignment System
+                <!-- Logo and Navigation -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="{{ url_for('index') }}" class="text-gray-900 text-xl font-semibold flex items-center hover:text-primary transition-colors duration-200">
+                            <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-graduation-cap text-white text-sm"></i>
+                            </div>
+                            Assignment System
                         </a>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                    <!-- Desktop Navigation -->
+                    <div class="hidden md:ml-8 md:flex md:space-x-6">
                         {% if current_user.is_authenticated %}
                             {% if current_user.is_teacher %}
-                                <a href="{{ url_for('teacher_dashboard') }}" class="text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                    <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                                <a href="{{ url_for('teacher_dashboard') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors duration-200">
+                                    Dashboard
                                 </a>
-                                <a href="{{ url_for('create_assignment') }}" class="text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                    <i class="fas fa-plus mr-1"></i>Create Assignment
+                                <a href="{{ url_for('create_assignment') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors duration-200">
+                                    Create Assignment
                                 </a>
                             {% else %}
-                                <a href="{{ url_for('student_dashboard') }}" class="text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                    <i class="fas fa-tachometer-alt mr-1"></i>Dashboard
+                                <a href="{{ url_for('student_dashboard') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors duration-200">
+                                    Dashboard
                                 </a>
                             {% endif %}
                         {% endif %}
                     </div>
                 </div>
-                <div class="hidden sm:ml-6 sm:flex sm:items-center">
+
+                <!-- Right side - User menu -->
+                <div class="flex items-center space-x-4">
                     {% if current_user.is_authenticated %}
-                        <div class="ml-3 relative">
-                            <div class="flex items-center space-x-4">
-                                <span class="text-white text-sm font-medium">
-                                    <i class="fas fa-user mr-1"></i>{{ current_user.username }}
-                                </span>
-                                <a href="{{ url_for('logout') }}" class="text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                    <i class="fas fa-sign-out-alt mr-1"></i>Logout
-                                </a>
+                        <!-- User info and logout -->
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2 text-sm text-gray-700">
+                                <div class="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-user text-gray-600 text-xs"></i>
+                                </div>
+                                <span class="hidden sm:block font-medium">{{ current_user.username }}</span>
+                                <span class="hidden sm:block text-xs text-gray-500">({{ 'Teacher' if current_user.is_teacher else 'Student' }})</span>
                             </div>
+                            <a href="{{ url_for('logout') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors duration-200">
+                                Sign out
+                            </a>
                         </div>
                     {% else %}
-                        <div class="flex space-x-4">
-                            <a href="{{ url_for('login') }}" class="text-white hover:text-blue-200 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                <i class="fas fa-sign-in-alt mr-1"></i>Login
+                        <!-- Login/Register buttons -->
+                        <div class="flex items-center space-x-4">
+                            <a href="{{ url_for('login') }}" class="text-gray-600 hover:text-gray-900 text-sm font-medium transition-colors duration-200">
+                                Sign in
                             </a>
-                            <a href="{{ url_for('register') }}" class="bg-white text-primary hover:bg-gray-100 px-3 py-2 rounded-md text-sm font-medium flex items-center">
-                                <i class="fas fa-user-plus mr-1"></i>Register
+                            <a href="{{ url_for('register') }}" class="bg-primary text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md">
+                                Get started
                             </a>
                         </div>
                     {% endif %}
+
+                    <!-- Mobile menu button -->
+                    <div class="md:hidden">
+                        <button onclick="toggleMobileMenu()" class="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-50 transition-colors duration-200">
+                            <i class="fas fa-bars text-lg"></i>
+                        </button>
+                        
+                        <!-- Mobile menu -->
+                        <div id="mobileMenu" class="hidden absolute right-4 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                            {% if current_user.is_authenticated %}
+                                <div class="px-4 py-2 border-b border-gray-100">
+                                    <p class="text-sm font-medium text-gray-900">{{ current_user.username }}</p>
+                                    <p class="text-xs text-gray-500">{{ 'Teacher' if current_user.is_teacher else 'Student' }}</p>
+                                </div>
+                                {% if current_user.is_teacher %}
+                                    <a href="{{ url_for('teacher_dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                        Dashboard
+                                    </a>
+                                    <a href="{{ url_for('create_assignment') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                        Create Assignment
+                                    </a>
+                                {% else %}
+                                    <a href="{{ url_for('student_dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                        Dashboard
+                                    </a>
+                                {% endif %}
+                                <a href="{{ url_for('logout') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                    Sign out
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('login') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                    Sign in
+                                </a>
+                                <a href="{{ url_for('register') }}" class="block px-4 py-2 text-sm text-gray-700 hover:text-gray-900 transition-colors duration-200">
+                                    Get started
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </nav>
 
-    <main class="min-h-screen bg-gray-50">
-        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="min-h-screen bg-white">
+        <div class="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     <div class="mb-6">
@@ -115,12 +165,34 @@
         </div>
     </main>
 
-    <footer class="bg-white border-t border-gray-200">
-        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-            <p class="text-center text-gray-500 text-sm">&copy; 2024 Assignment System. Built with Flask & Tailwind CSS.</p>
+    <footer class="bg-gray-50 border-t border-gray-200 mt-16">
+        <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <div class="text-center">
+                <p class="text-gray-500 text-sm">&copy; 2024 Assignment System. Built with Flask & Tailwind CSS.</p>
+            </div>
         </div>
     </footer>
 
+    <script>
+        function toggleMobileMenu() {
+            const mobileMenu = document.getElementById('mobileMenu');
+            if (mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.remove('hidden');
+            } else {
+                mobileMenu.classList.add('hidden');
+            }
+        }
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const mobileMenu = document.getElementById('mobileMenu');
+            const mobileMenuButton = event.target.closest('button[onclick="toggleMobileMenu()"]');
+            
+            if (!mobileMenuButton && !mobileMenu.contains(event.target)) {
+                mobileMenu.classList.add('hidden');
+            }
+        });
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
