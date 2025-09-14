@@ -280,6 +280,8 @@ class SolutionTree:
         self.numNodes = 0
         self.root = self.Node(None, self.numNodes)  # Root gets creation_index 0
         self.numNodes += 1
+        self.solution_uid_to_index={}
+        self.solutions=[]
     
     def generateTree(self):
         edges = []  # List of tuples (parent_creation_index, child_creation_index)
@@ -301,15 +303,21 @@ class SolutionTree:
         
         # Start DFS from root
         dfs(self.root)
-        
+        submissions = []
+        for uid, idx in self.solution_uid_to_index.items():
+            submissions.append({
+                "submission_uid": uid,
+                "submission_nodes": self.solutions[idx]
+            })
         return {
             "edges": edges,
             "node_summaries": node_summaries,
-            "node_correctness": node_correctness,
-            "total_nodes": self.numNodes
+            "step_is_correct": node_correctness,
+            "submissions" : submissions
         }
     
     def addSolution(self, solution_uid, solution_text, is_correct):
+        self.solution_uid_to_index[solution_uid] = len(self.solutions)
         cur_node = self.root
         nodeList=[]
         while True:
@@ -339,7 +347,7 @@ class SolutionTree:
             unshared1=cur_node.children[res].parent_summary
             unshared2=solution_text
             if res != -1:
-                response = SolutionTree.api_manager.query([{"role":"system","content":f"You are given two possibly incomplete solutions to a {self.subject_domain} problem. Find the largest prefix of steps that the two solutions have in common, verifying equal intermediate values. If there are no shared steps, simply respond with an empty string.Respond with the shared part and the unshared parts in the following format:\n ###\n [Shared Steps] ###\n [Unshared steps from first solution] ###\n [Unshared steps from second solution]"},{"role":"user","content":f"Solution 1:\n{cur_node.children[res].parent_summary}\nSolution 2:\n{solution_text}"}])
+                response = SolutionTree.api_manager.query([{"role":"system","content":f"You are given two possibly incomplete solutions to a {self.subject_domain} problem. Find the largest prefix of steps that the two solutions have in common, verifying equal intermediate values. If there are no shared steps, simply respond with an empty string. Respond with the shared part and the unshared parts in the following format:\n ###\n [Shared Steps] ###\n [Unshared steps from first solution] ###\n [Unshared steps from second solution]"},{"role":"user","content":f"Solution 1:\n{cur_node.children[res].parent_summary}\nSolution 2:\n{solution_text}"}])
                 if response is None:
                     print("die")
                     return False
@@ -367,4 +375,5 @@ class SolutionTree:
             cur_node.is_correct=True
             for node in reversed(nodeList):
                 node.pull_correctness()
+        self.solutions.append(nodeList)
         return True
